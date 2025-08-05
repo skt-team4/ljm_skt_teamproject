@@ -1,89 +1,125 @@
-import React, { useState, useEffect } from 'react';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
+  BackHandler,
+  Dimensions,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Keyboard,
-  Dimensions,
+  View
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 
 // 화면 크기 가져오기
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallScreen = SCREEN_HEIGHT < 700;
 
-// --- 1. 타입 및 데이터 정의 ---
+// --- 1. 타입 및 API 설정 ---
 
-// 식사 메뉴 관련 타입 정의
-type Meal = {
-  name: string;
-  description: string;
-  emoji: string;
+// API 응답 타입 정의
+type ApiResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    recommendations?: any[];
+    category?: string;
+  };
+  error?: string;
 };
+
+// API 설정 (여기서 실제 API URL로 변경하세요)
+const API_CONFIG = {
+  baseUrl: 'https://your-api-domain.com/api', // 실제 API URL로 변경 필요
+  endpoints: {
+    chat: '/chat',
+    recommend: '/recommend',
+  },
+  timeout: 10000, // 10초 타임아웃
+};
+
+// 메시지 타입 정의
+type Message = {
+  id: string;
+  text: string;
+  isUser: boolean;
+  timestamp: Date;
+  category?: string;
+};
+
 type MealCategory = 'distance' | 'cost' | 'preference' | 'allergy';
 
-// 챗봇이 사용할 식사 추천 데이터
-const mealRecommendations: Record<MealCategory, Meal[]> = {
-  distance: [
-    { name: '비빔밥', description: '색깔 야채가 가득한 영양 만점 급식!', emoji: '🍚' },
-    { name: '된장찌개', description: '따뜻하고 건강한 한식 메뉴!', emoji: '🍲' },
-    { name: '잡채', description: '쫄깃한 당면과 야채의 조화!', emoji: '🍜' },
-  ],
-  cost: [
-    { name: '현미밥', description: '식이섬유가 풍부한 건강한 주식!', emoji: '🍚' },
-    { name: '생선구이', description: '단백질과 오메가3가 풍부!', emoji: '🐟' },
-    { name: '나물반찬', description: '각종 비타민이 가득한 나물들!', emoji: '🥬' },
-  ],
-  preference: [
-    { name: '김밥 도시락', description: '한 끼 식사로 완벽한 김밥!', emoji: '🍙' },
-    { name: '치킨 도시락', description: '아이들이 좋아하는 치킨!', emoji: '🍗' },
-    { name: '불고기 도시락', description: '달콤한 불고기와 밥!', emoji: '🥩' },
-  ],
-  allergy: [
-    { name: '알레르기 표시', description: '견과류, 우유, 계란 등 주의 표시를 확인하세요!', emoji: '⚠️' },
-    { name: '대체 메뉴', description: '알레르기가 있다면 영양사 선생님께 문의!', emoji: '👨‍⚕️' },
-    { name: '안전한 급식', description: '모든 아이들이 안전하게 먹을 수 있어요!', emoji: '✅' },
-  ],
-};
+// --- 2. API 호출 함수들 ---
 
-// 카테고리별 챗봇 초기 응답 메시지
-const responses: Record<MealCategory, string> = {
-  distance: '오늘의 추천 급식 메뉴예요! 영양사 선생님이 특별히 준비하신 메뉴들이에요!',
-  cost: '건강한 급식 메뉴를 추천해드릴게요! 성장기 어린이에게 꼭 필요한 영양소가 가득해요!',
-  preference: '맛있는 도시락 메뉴를 준비했어요! 한 끼 식사로 완벽한 구성이에요!',
-  allergy: '알레르기 관련 안내해드릴게요! 안전한 급식을 위해 꼭 확인하세요!',
-};
+// 챗봇 메시지 전송 API
+async function sendChatMessage(message: string, category?: MealCategory): Promise<ApiResponse> {
+  try {
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.chat}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        message: message.trim(),
+        category: category,
+        timestamp: new Date().toISOString(),
+        context: 'meal_recommendation', // 급식 추천 컨텍스트
+      }),
+      // 타임아웃 설정을 위한 signal (React Native에서 지원하는 경우)
+    });
 
-// --- 2. 챗봇 로직 함수 ---
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-// 사용자 입력을 분석하여 카테고리를 결정하는 함수
-function analyzeInput(message: string): { category: MealCategory } {
-  const msg = message.toLowerCase();
-  if (msg.includes('거리') || msg.includes('추천')) return { category: 'distance' };
-  if (msg.includes('가격') || msg.includes('영양')) return { category: 'cost' };
-  if (msg.includes('선호도')) return { category: 'preference' };
-  if (msg.includes('알레르기') || msg.includes('주의')) return { category: 'allergy' };
-  return { category: 'distance' };
+    const data: ApiResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('API 호출 오류:', error);
+    return {
+      success: false,
+      message: '죄송해요, 일시적으로 응답할 수 없어요. 잠시 후 다시 시도해 주세요.',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
 
-// 분석된 카테고리에 맞는 전체 응답 메시지를 생성하는 함수
-function generateResponse(analysis: { category: MealCategory }): string {
-  let response = responses[analysis.category] + '\n\n';
-  const meals = mealRecommendations[analysis.category];
-
-  if (meals) {
-    meals.forEach(meal => {
-      response += `${meal.emoji} ${meal.name}\n${meal.description}\n\n`;
+// 카테고리별 추천 API
+async function getCategoryRecommendation(category: MealCategory): Promise<ApiResponse> {
+  try {
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.recommend}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        category: category,
+        timestamp: new Date().toISOString(),
+        requestType: 'category_recommendation',
+      }),
     });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: ApiResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('카테고리 추천 API 오류:', error);
+    return {
+      success: false,
+      message: '추천 메뉴를 불러오는 중 오류가 발생했어요. 다시 시도해 주세요.',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
-  return response.trim();
 }
 
 // --- 3. React 컴포넌트 ---
@@ -104,6 +140,11 @@ export default function ChatScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [currentGifIndex, setCurrentGifIndex] = useState(0);
+  
+  // 새로 추가된 상태들
+  const [isLoading, setIsLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // 여러 GIF 애니메이션 배열
   const gifAnimations = [
@@ -132,7 +173,6 @@ export default function ChatScreen() {
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
-        // 키보드가 완전히 사라진 후 상태 업데이트
         setTimeout(() => {
           setIsKeyboardVisible(false);
           setKeyboardHeight(0);
@@ -146,37 +186,165 @@ export default function ChatScreen() {
     };
   }, []);
 
-  // 카테고리 버튼 클릭 처리
-  const handleCategoryPress = (category: MealCategory) => {
-    const analysis = { category };
-    const response = generateResponse(analysis);
-    setCurrentResponse(response);
-    setShowResponse(true);
+  // 안드로이드 뒤로 가기 버튼 처리
+  useEffect(() => {
+    const backAction = () => {
+      if (showResponse) {
+        handleBackToMenu();
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction,
+    );
+
+    return () => backHandler.remove();
+  }, [showResponse]);
+
+  // --- 4. API 호출 함수들 ---
+
+  // 카테고리 버튼 클릭 처리 (API 버전)
+  const handleCategoryPress = async (category: MealCategory) => {
+    setIsLoading(true);
+    setApiError(null);
+    
+    // 로딩 중 애니메이션 변경
+    setCurrentGifIndex(1); // yammi_think.gif
+    
+    try {
+      const response = await getCategoryRecommendation(category);
+      
+      if (response.success) {
+        setCurrentResponse(response.message);
+        setShowResponse(true);
+        
+        // 메시지 히스토리에 추가
+        const newMessage: Message = {
+          id: Date.now().toString(),
+          text: response.message,
+          isUser: false,
+          timestamp: new Date(),
+          category: category,
+        };
+        setMessages(prev => [...prev, newMessage]);
+        
+        // 카테고리에 따라 다른 애니메이션
+        switch (category) {
+          case 'distance':
+            setCurrentGifIndex(2); // yammi_waiting.gif
+            break;
+          case 'cost':
+            setCurrentGifIndex(3); // yammi_tmp.gif
+            break;
+          case 'preference':
+            setCurrentGifIndex(0); // yammi_welcome.gif
+            break;
+          case 'allergy':
+            setCurrentGifIndex(1); // yammi_think.gif
+            break;
+          default:
+            setCurrentGifIndex(0);
+        }
+      } else {
+        // API 오류 처리
+        setApiError(response.error || '알 수 없는 오류가 발생했습니다.');
+        setCurrentResponse(response.message);
+        setShowResponse(true);
+        setCurrentGifIndex(0); // 기본 애니메이션
+      }
+    } catch (error) {
+      console.error('카테고리 처리 오류:', error);
+      setApiError('네트워크 오류가 발생했습니다.');
+      setCurrentResponse('죄송해요, 일시적으로 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.');
+      setShowResponse(true);
+      setCurrentGifIndex(0);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // 텍스트 입력으로 질문하기
-  const handleSendMessage = () => {
-    if (inputText.trim() === '') return;
+  // 텍스트 입력으로 질문하기 (API 버전)
+  const handleSendMessage = async () => {
+    if (inputText.trim() === '' || isLoading) return;
     
-    const analysis = analyzeInput(inputText);
-    const response = generateResponse(analysis);
-    setCurrentResponse(response);
-    setShowResponse(true);
+    const userMessage = inputText.trim();
     setInputText('');
+    setIsLoading(true);
+    setApiError(null);
     
-    // 키보드 숨기기 - 더 빠른 타이밍
+    // 키보드 숨기기
     Keyboard.dismiss();
+    
+    // 사용자 메시지를 히스토리에 추가
+    const userMessageObj: Message = {
+      id: Date.now().toString(),
+      text: userMessage,
+      isUser: true,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessageObj]);
+    
+    // 로딩 애니메이션
+    setCurrentGifIndex(1); // yammi_think.gif
+    
+    try {
+      const response = await sendChatMessage(userMessage);
+      
+      if (response.success) {
+        setCurrentResponse(response.message);
+        setShowResponse(true);
+        
+        // 봇 응답을 히스토리에 추가
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: response.message,
+          isUser: false,
+          timestamp: new Date(),
+          category: response.data?.category,
+        };
+        setMessages(prev => [...prev, botMessage]);
+        
+        // 응답 후 애니메이션
+        setCurrentGifIndex(0); // yammi_welcome.gif
+      } else {
+        // API 오류 처리
+        setApiError(response.error || '알 수 없는 오류가 발생했습니다.');
+        setCurrentResponse(response.message);
+        setShowResponse(true);
+        setCurrentGifIndex(0);
+      }
+    } catch (error) {
+      console.error('메시지 전송 오류:', error);
+      setApiError('네트워크 오류가 발생했습니다.');
+      setCurrentResponse('죄송해요, 일시적으로 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.');
+      setShowResponse(true);
+      setCurrentGifIndex(0);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // 초기 화면으로 돌아가기
+  // 초기 화면으로 돌아가기 (말풍선 닫기)
   const handleBackToMenu = () => {
-    // 키보드 먼저 숨기고 즉시 상태 초기화
     Keyboard.dismiss();
+    setShowResponse(false);
+    setCurrentResponse('');
+    setInputText('');
+    setCurrentGifIndex(0);
+    setApiError(null);
+  };
+
+  // 에러 다시 시도
+  const handleRetry = () => {
+    setApiError(null);
     setShowResponse(false);
     setCurrentResponse('');
   };
 
-  // 반응형 스타일 계산 - 스마트폰만
+  // 반응형 스타일 계산
   const dynamicStyles = {
     welcomeText: {
       ...styles.welcomeText,
@@ -186,6 +354,7 @@ export default function ChatScreen() {
       ...styles.categoryButton,
       paddingVertical: isSmallScreen ? 8 : 12,
       paddingHorizontal: isSmallScreen ? 6 : 8,
+      opacity: isLoading ? 0.6 : 1, // 로딩 중 버튼 비활성화 표시
     },
     categoryButtonText: styles.categoryButtonText,
     characterGif: {
@@ -205,12 +374,10 @@ export default function ChatScreen() {
         style={[styles.header, { paddingTop: insets.top + 10 }]}
       >
         <View style={styles.headerContent}>
-          {/* 왼쪽: YUM:AI 로고 */}
           <View style={styles.leftSection}>
             <Text style={[styles.headerTitle, { fontSize: isSmallScreen ? 24 : 28 }]}>YUM:AI</Text>
           </View>
           
-          {/* 오른쪽: 설정, 챗봇, 영양소 분석, X 버튼 */}
           <View style={styles.rightSection}>
             <TouchableOpacity style={styles.settingsButton}>
               <Image
@@ -234,118 +401,133 @@ export default function ChatScreen() {
 
       {/* 메인 컨텐츠 */}
       <View style={[styles.mainContainer, isKeyboardVisible && styles.keyboardActiveContainer]}>
-        {!showResponse ? (
-          // 초기 화면
-          <ScrollView 
-            style={styles.scrollContainer}
-            contentContainerStyle={[
-              styles.scrollContent,
-              { 
-                // 키보드에 따른 동적 패딩
-                paddingBottom: isKeyboardVisible ? keyboardHeight + 20 : 120,
-                minHeight: isKeyboardVisible ? undefined : SCREEN_HEIGHT * 0.6,
-              }
-            ]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={[
-              styles.welcomeContainer, 
-              { 
-                marginTop: isSmallScreen ? 15 : 30,
-                marginBottom: isSmallScreen ? 15 : 30,
-              }
-            ]}>
-              <Text style={dynamicStyles.welcomeText}>안녕하세요! 얌이에요!</Text>
-              <Text style={dynamicStyles.welcomeText}>오늘은 "오일 파스타" 어때요?</Text>
-            </View>
-
-            {/* 카테고리 버튼들 */}
-            <View style={[
-              styles.categoryContainer,
-              {
-                marginBottom: isSmallScreen ? 15 : 30,
-                paddingHorizontal: isSmallScreen ? 5 : 15,
-              }
-            ]}>
-              <TouchableOpacity 
-                style={dynamicStyles.categoryButton}
-                onPress={() => handleCategoryPress('distance')}
-              >
-                <Text style={dynamicStyles.categoryButtonText}>거리</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={dynamicStyles.categoryButton}
-                onPress={() => handleCategoryPress('cost')}
-              >
-                <Text style={dynamicStyles.categoryButtonText}>가격</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={dynamicStyles.categoryButton}
-                onPress={() => handleCategoryPress('preference')}
-              >
-                <Text style={dynamicStyles.categoryButtonText}>선호도</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={dynamicStyles.categoryButton}
-                onPress={() => handleCategoryPress('allergy')}
-              >
-                <Text style={dynamicStyles.categoryButtonText}>알레르기</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* 캐릭터 애니메이션 */}
-            {!isKeyboardVisible && (
-              <View style={[
-                styles.characterContainer,
-                { minHeight: isSmallScreen ? 150 : 200 }
-              ]}>
-                <TouchableOpacity onPress={handleGifClick} activeOpacity={0.8}>
-                  <Image
-                    source={gifAnimations[currentGifIndex]}
-                    style={dynamicStyles.characterGif}
-                    contentFit="contain"
-                    transition={1000}
-                  />
-                </TouchableOpacity>
-              </View>
+        <ScrollView 
+          style={styles.scrollContainer}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { 
+              paddingBottom: isKeyboardVisible ? keyboardHeight + 20 : 120,
+              minHeight: isKeyboardVisible ? undefined : SCREEN_HEIGHT * 0.6,
+            }
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[
+            styles.welcomeContainer, 
+            { 
+              marginTop: isSmallScreen ? 15 : 30,
+              marginBottom: isSmallScreen ? 15 : 30,
+              minHeight: isSmallScreen ? 80 : 100,
+            }
+          ]}>
+            {!showResponse && (
+              <>
+                <Text style={dynamicStyles.welcomeText}>안녕하세요! 얌이에요!</Text>
+                <Text style={dynamicStyles.welcomeText}>
+                  {isLoading ? "답변을 준비하고 있어요..." : "오늘은 \"오일 파스타\" 어때요?"}
+                </Text>
+              </>
             )}
-          </ScrollView>
-        ) : (
-          // 응답 화면
-          <ScrollView 
-            style={styles.responseContainer}
-            contentContainerStyle={[
-              styles.responseScrollContent,
-              { 
-                paddingBottom: isKeyboardVisible ? keyboardHeight + 20 : 120,
-                minHeight: isKeyboardVisible ? undefined : SCREEN_HEIGHT * 0.5,
-              }
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+          </View>
+
+          {/* 카테고리 버튼들 */}
+          <View style={[
+            styles.categoryContainer,
+            {
+              marginBottom: isSmallScreen ? 15 : 30,
+              paddingHorizontal: isSmallScreen ? 5 : 15,
+            }
+          ]}>
             <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBackToMenu}
+              style={dynamicStyles.categoryButton}
+              onPress={() => handleCategoryPress('distance')}
+              disabled={isLoading}
             >
-              <Text style={styles.backButtonText}>← 메뉴로 돌아가기</Text>
+              <Text style={dynamicStyles.categoryButtonText}>거리</Text>
             </TouchableOpacity>
-            
-            <View style={styles.responseBox}>
-              <Text style={[styles.responseText, { fontSize: isSmallScreen ? 14 : 16 }]}>
-                {currentResponse}
-              </Text>
+            <TouchableOpacity 
+              style={dynamicStyles.categoryButton}
+              onPress={() => handleCategoryPress('cost')}
+              disabled={isLoading}
+            >
+              <Text style={dynamicStyles.categoryButtonText}>가격</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={dynamicStyles.categoryButton}
+              onPress={() => handleCategoryPress('preference')}
+              disabled={isLoading}
+            >
+              <Text style={dynamicStyles.categoryButtonText}>선호도</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={dynamicStyles.categoryButton}
+              onPress={() => handleCategoryPress('allergy')}
+              disabled={isLoading}
+            >
+              <Text style={dynamicStyles.categoryButtonText}>알레르기</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 캐릭터 애니메이션과 말풍선 */}
+          {!isKeyboardVisible && (
+            <View style={[
+              styles.characterContainer,
+              { minHeight: isSmallScreen ? 150 : 200 }
+            ]}>
+              {/* 말풍선 - 응답이 있을 때만 표시 */}
+              {showResponse && (
+                <View style={styles.speechBubbleContainer}>
+                  <View style={styles.speechBubble}>
+                    <TouchableOpacity 
+                      style={styles.bubbleCloseButton}
+                      onPress={handleBackToMenu}
+                    >
+                      <Text style={styles.bubbleCloseButtonText}>✕</Text>
+                    </TouchableOpacity>
+                    
+                    {/* 에러 표시 및 재시도 버튼 */}
+                    {apiError && (
+                      <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>⚠️ {apiError}</Text>
+                        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+                          <Text style={styles.retryButtonText}>다시 시도</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    
+                    <ScrollView 
+                      style={styles.bubbleScrollView}
+                      contentContainerStyle={styles.bubbleScrollContent}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      <Text style={[styles.bubbleText, { fontSize: isSmallScreen ? 13 : 15 }]}>
+                        {isLoading ? "생각하고 있어요... 🤔" : currentResponse}
+                      </Text>
+                    </ScrollView>
+                  </View>
+                  <View style={styles.speechBubbleTail} />
+                </View>
+              )}
+              
+              {/* GIF 캐릭터 */}
+              <TouchableOpacity onPress={handleGifClick} activeOpacity={0.8}>
+                <Image
+                  source={gifAnimations[currentGifIndex]}
+                  style={dynamicStyles.characterGif}
+                  contentFit="contain"
+                  transition={1000}
+                />
+              </TouchableOpacity>
             </View>
-          </ScrollView>
-        )}
+          )}
+        </ScrollView>
       </View>
 
-      {/* 하단 입력창 - 절대 위치로 고정 */}
+      {/* 하단 입력창 */}
       <View style={[
         styles.inputContainer,
         { 
-          // 키보드 높이만큼 위로 이동 (직접 계산)
           bottom: isKeyboardVisible ? keyboardHeight + 30 : 0,
           paddingBottom: isKeyboardVisible ? 15 : Math.max(insets.bottom, 10),
         }
@@ -354,15 +536,19 @@ export default function ChatScreen() {
           <TextInput
             style={[
               styles.textInput,
-              { fontSize: isSmallScreen ? 14 : 16 }
+              { 
+                fontSize: isSmallScreen ? 14 : 16,
+                opacity: isLoading ? 0.6 : 1, // 로딩 중 입력창 비활성화 표시
+              }
             ]}
             value={inputText}
             onChangeText={setInputText}
-            placeholder="얌이에게 메뉴 추천을 받아보세요!"
+            placeholder={isLoading ? "처리 중..." : "얌이에게 메뉴 추천을 받아보세요!"}
             placeholderTextColor="#999"
             returnKeyType="send"
             onSubmitEditing={handleSendMessage}
             blurOnSubmit={true}
+            editable={!isLoading}
           />
           <TouchableOpacity 
             style={[
@@ -370,14 +556,18 @@ export default function ChatScreen() {
               { 
                 paddingHorizontal: isSmallScreen ? 16 : 20,
                 paddingVertical: isSmallScreen ? 10 : 12,
+                opacity: isLoading || inputText.trim() === '' ? 0.6 : 1,
               }
             ]}
             onPress={handleSendMessage}
+            disabled={isLoading || inputText.trim() === ''}
           >
             <Text style={[
               styles.sendButtonText,
               { fontSize: isSmallScreen ? 14 : 16 }
-            ]}>전송</Text>
+            ]}>
+              {isLoading ? '전송 중...' : '전송'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -385,7 +575,7 @@ export default function ChatScreen() {
   );
 }
 
-// --- 4. 스타일시트 ---
+// --- 5. 스타일시트 (기존 + 새로운 스타일 추가) ---
 
 const styles = StyleSheet.create({
   container: {
@@ -502,51 +692,129 @@ const styles = StyleSheet.create({
   },
   characterContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     flex: 1,
+    marginTop: 60,
+    position: 'relative',
   },
-  characterGif: {
-    width: 280,
-    height: 280,
+  
+  // 말풍선 관련 스타일들
+  speechBubbleContainer: {
+    position: 'absolute',
+    top: -285,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    alignItems: 'center',
   },
-  responseContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  responseScrollContent: {
-    paddingTop: 20,
-    flexGrow: 1,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-    paddingVertical: 8,
-  },
-  backButtonText: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#FFBF00',
-    fontWeight: 'bold',
-  },
-  responseBox: {
+  
+  speechBubble: {
     backgroundColor: 'white',
-    padding: isSmallScreen ? 16 : 20,
-    borderRadius: 15,
+    borderRadius: 20,
+    padding: 20,
+    maxWidth: SCREEN_WIDTH - 40,
+    minWidth: 280,
+    maxHeight: 400,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#FFBF00',
   },
-  responseText: {
-    fontSize: 16,
-    lineHeight: isSmallScreen ? 22 : 24,
+  
+  speechBubbleTail: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 15,
+    borderRightWidth: 15,
+    borderTopWidth: 20,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'white',
+    marginTop: -4,
+  },
+  
+  bubbleCloseButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
+    backgroundColor: '#FFBF00',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  bubbleCloseButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  
+  bubbleScrollView: {
+    maxHeight: 220,
+    paddingTop: 10,
+  },
+  
+  bubbleScrollContent: {
+    paddingBottom: 5,
+  },
+  
+  bubbleText: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#333',
+    textAlign: 'left',
+  },
+  
+  characterGif: {
+    width: 250,
+    height: 250,
+  },
+  
+  // 새로 추가된 에러 관련 스타일들
+  errorContainer: {
+    backgroundColor: '#FFE6E6',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#FFB3B3',
+  },
+  
+  errorText: {
+    fontSize: 12,
+    color: '#D32F2F',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  
+  retryButton: {
+    backgroundColor: '#FFBF00',
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderRadius: 15,
+    alignSelf: 'center',
+  },
+  
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
     color: '#333',
   },
+
+  // 기존 스타일들
   inputContainer: {
-    position: 'absolute', // 절대 위치로 고정
+    position: 'absolute',
     left: 0,
     right: 0,
     backgroundColor: 'white',
