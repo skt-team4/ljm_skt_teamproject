@@ -29,18 +29,19 @@ type ApiResponse = {
   data?: {
     recommendations?: any[];
     category?: string;
+    usage?: any;
   };
   error?: string;
 };
 
-// API 설정 (여기서 실제 API URL로 변경하세요)
+// OpenAI API 설정
 const API_CONFIG = {
-  baseUrl: 'https://your-api-domain.com/api', // 실제 API URL로 변경 필요
-  endpoints: {
-    chat: '/chat',
-    recommend: '/recommend',
+  openai: {
+    baseUrl: 'https://api.openai.com/v1/chat/completions',
+    apiKey: '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', // 실제 OpenAI API 키로 변경 필요
+    model: 'gpt-3.5-turbo',
   },
-  timeout: 10000, // 10초 타임아웃
+  timeout: 15000, // 15초 타임아웃
 };
 
 // 메시지 타입 정의
@@ -56,67 +57,117 @@ type MealCategory = 'distance' | 'cost' | 'preference' | 'allergy';
 
 // --- 2. API 호출 함수들 ---
 
-// 챗봇 메시지 전송 API
+// OpenAI API를 통한 챗봇 메시지 전송
 async function sendChatMessage(message: string, category?: MealCategory): Promise<ApiResponse> {
   try {
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.chat}`, {
+    // 카테고리별 시스템 프롬프트 설정
+    const getCategoryPrompt = (cat?: MealCategory) => {
+      const basePrompt = `당신은 "얌이"라는 이름의 친근하고 귀여운 급식 추천 AI입니다. 
+한국의 초등학교/중학교 급식을 전문으로 추천하며, 어린이들이 좋아할 만한 톤으로 대화합니다.
+응답은 한국어로 하며, 200자 이내로 간결하게 답변해주세요.
+이모지를 적절히 사용해서 친근하게 답변해주세요.`;
+
+      const categoryPrompts = {
+        distance: `${basePrompt}\n지금은 "거리/접근성" 관련 급식 추천을 요청받았습니다. 학교 근처에서 쉽게 구할 수 있는 재료로 만든 급식 메뉴를 추천해주세요.`,
+        cost: `${basePrompt}\n지금은 "가격/영양" 관련 급식 추천을 요청받았습니다. 경제적이면서도 영양가 높은 급식 메뉴를 추천해주세요.`,
+        preference: `${basePrompt}\n지금은 "선호도" 관련 급식 추천을 요청받았습니다. 아이들이 좋아하는 인기 급식 메뉴를 추천해주세요.`,
+        allergy: `${basePrompt}\n지금은 "알레르기" 관련 정보를 요청받았습니다. 급식의 알레르기 정보와 안전한 식사에 대해 안내해주세요.`
+      };
+
+      return cat ? categoryPrompts[cat] : basePrompt;
+    };
+
+    const response = await fetch(API_CONFIG.openai.baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Authorization': `Bearer ${API_CONFIG.openai.apiKey}`,
       },
       body: JSON.stringify({
-        message: message.trim(),
-        category: category,
-        timestamp: new Date().toISOString(),
-        context: 'meal_recommendation', // 급식 추천 컨텍스트
+        model: API_CONFIG.openai.model,
+        messages: [
+          {
+            role: 'system',
+            content: getCategoryPrompt(category)
+          },
+          {
+            role: 'user',
+            content: message.trim()
+          }
+        ],
+        max_tokens: 300,
+        temperature: 0.8,
+        presence_penalty: 0.1,
+        frequency_penalty: 0.1,
       }),
-      // 타임아웃 설정을 위한 signal (React Native에서 지원하는 경우)
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
-    const data: ApiResponse = await response.json();
-    return data;
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from OpenAI');
+    }
+
+    return {
+      success: true,
+      message: data.choices[0].message.content.trim(),
+      data: {
+        category: category,
+        usage: data.usage,
+      }
+    };
   } catch (error) {
-    console.error('API 호출 오류:', error);
+    console.error('OpenAI API 호출 오류:', error);
+    
+    // API 키 관련 오류 체크
+    if (error instanceof Error && error.message.includes('401')) {
+      return {
+        success: false,
+        message: '⚠️ API 키 설정을 확인해주세요. OpenAI API 키가 올바르지 않습니다.',
+        error: 'Invalid API key',
+      };
+    }
+    
+    // 할당량 초과 오류 체크
+    if (error instanceof Error && error.message.includes('429')) {
+      return {
+        success: false,
+        message: '⚠️ API 사용량이 초과되었어요. 잠시 후 다시 시도해주세요.',
+        error: 'Rate limit exceeded',
+      };
+    }
+
     return {
       success: false,
-      message: '죄송해요, 일시적으로 응답할 수 없어요. 잠시 후 다시 시도해 주세요.',
+      message: '죄송해요, 일시적으로 응답할 수 없어요. 잠시 후 다시 시도해 주세요. 🥺',
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
 
-// 카테고리별 추천 API
+// OpenAI API를 통한 카테고리별 추천
 async function getCategoryRecommendation(category: MealCategory): Promise<ApiResponse> {
   try {
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.recommend}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        category: category,
-        timestamp: new Date().toISOString(),
-        requestType: 'category_recommendation',
-      }),
-    });
+    // 카테고리별 미리 정의된 질문들
+    const categoryQuestions = {
+      distance: '학교 근처에서 쉽게 구할 수 있는 재료로 만든 오늘의 급식 메뉴를 추천해주세요',
+      cost: '경제적이면서도 영양가 높은 급식 메뉴를 추천해주세요',
+      preference: '아이들이 가장 좋아하는 인기 급식 메뉴를 추천해주세요',
+      allergy: '급식의 알레르기 주의사항과 안전한 식사 방법에 대해 알려주세요'
+    };
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data: ApiResponse = await response.json();
-    return data;
+    // sendChatMessage 함수를 재사용
+    return await sendChatMessage(categoryQuestions[category], category);
   } catch (error) {
-    console.error('카테고리 추천 API 오류:', error);
+    console.error('카테고리 추천 오류:', error);
     return {
       success: false,
-      message: '추천 메뉴를 불러오는 중 오류가 발생했어요. 다시 시도해 주세요.',
+      message: '추천 메뉴를 불러오는 중 오류가 발생했어요. 다시 시도해 주세요. 😅',
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
@@ -423,10 +474,15 @@ export default function ChatScreen() {
           ]}>
             {!showResponse && (
               <>
-                <Text style={dynamicStyles.welcomeText}>안녕하세요! 얌이에요!</Text>
+                <Text style={dynamicStyles.welcomeText}>안녕하세요! 얌이에요! 🍽️</Text>
                 <Text style={dynamicStyles.welcomeText}>
-                  {isLoading ? "답변을 준비하고 있어요..." : "오늘은 \"오일 파스타\" 어때요?"}
+                  {isLoading ? "맛있는 추천을 준비하고 있어요... 🤔" : "오늘은 \"비빔밥\" 어때요? 🍚"}
                 </Text>
+                {API_CONFIG.openai.apiKey === 'YOUR_OPENAI_API_KEY_HERE' && (
+                  <Text style={styles.apiKeyWarning}>
+                    ⚠️ OpenAI API 키를 설정해주세요
+                  </Text>
+                )}
               </>
             )}
           </View>
@@ -502,7 +558,7 @@ export default function ChatScreen() {
                       showsVerticalScrollIndicator={false}
                     >
                       <Text style={[styles.bubbleText, { fontSize: isSmallScreen ? 13 : 15 }]}>
-                        {isLoading ? "생각하고 있어요... 🤔" : currentResponse}
+                        {isLoading ? "얌이가 맛있는 메뉴를 생각하고 있어요... 🤔💭" : currentResponse}
                       </Text>
                     </ScrollView>
                   </View>
@@ -543,7 +599,7 @@ export default function ChatScreen() {
             ]}
             value={inputText}
             onChangeText={setInputText}
-            placeholder={isLoading ? "처리 중..." : "얌이에게 메뉴 추천을 받아보세요!"}
+            placeholder={isLoading ? "처리 중..." : "얌이에게 급식 메뉴를 물어보세요! 🍽️"}
             placeholderTextColor="#999"
             returnKeyType="send"
             onSubmitEditing={handleSendMessage}
@@ -781,7 +837,15 @@ const styles = StyleSheet.create({
     height: 250,
   },
   
-  // 새로 추가된 에러 관련 스타일들
+  // 새로 추가된 API 키 경고 스타일
+  apiKeyWarning: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 20,
+    fontWeight: '600',
+  },
   errorContainer: {
     backgroundColor: '#FFE6E6',
     borderRadius: 10,
