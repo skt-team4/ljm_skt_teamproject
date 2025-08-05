@@ -38,7 +38,7 @@ type ApiResponse = {
 const API_CONFIG = {
   openai: {
     baseUrl: 'https://api.openai.com/v1/chat/completions',
-    apiKey: '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', // 실제 OpenAI API 키로 변경 필요
+    apiKey: 'api_key', // 실제 OpenAI API 키로 변경 필요
     model: 'gpt-3.5-turbo',
   },
   timeout: 15000, // 15초 타임아웃
