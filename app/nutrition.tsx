@@ -1,15 +1,15 @@
-// nutrition.tsx - 영양소 분석 페이지
+// nutrition.tsx - 영양소 분석 페이지 (헤더 중복 해결)
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isSmallScreen, styles } from '../styles/nutritionStyles';
@@ -132,10 +132,10 @@ export default function NutritionScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      {/* 헤더 */}
+      {/* 커스텀 헤더 (Safe Area까지 확장) */}
       <LinearGradient
         colors={['#FFBF00', '#FDD046']}
-        style={[styles.header, { paddingTop: insets.top + 10 }]}
+        style={[styles.header, { paddingTop: insets.top }]}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -144,7 +144,7 @@ export default function NutritionScreen() {
           
           <View style={styles.titleContainer}>
             <Text style={[styles.headerTitle, { fontSize: isSmallScreen ? 20 : 24 }]}>
-              영양소 분석
+              영양소
             </Text>
           </View>
           

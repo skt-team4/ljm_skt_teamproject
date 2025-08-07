@@ -37,3 +37,53 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# API Keys and secrets
+config/keys.js
+secrets/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/

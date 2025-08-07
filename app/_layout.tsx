@@ -1,12 +1,26 @@
-import React from 'react';
-import { StyleSheet, TouchableOpacity, Text, View, Image } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import React from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const isChatOpen = segments[segments.length - 1] === 'chat';
+  
+  // 디버깅용 (나중에 제거)
+  console.log('Current segments:', segments);
+  
+  // 플로팅 버튼을 숨길 화면들
+  const hideFloatingButtonScreens = ['chat', 'nutrition', 'settings'];
+  const currentScreen = segments[segments.length - 1];
+  const shouldHideFloatingButton = hideFloatingButtonScreens.includes(currentScreen);
+  
+  // 더 안전한 조건 검사
+  const isTabScreen = segments.length > 0 && segments[0] === '(tabs)';
+  const isInitialLoad = segments.length === 0; // 초기 로딩 상태
+  
+  // 초기 로딩이거나 탭 화면에서 + 제외 화면이 아닐 때 표시
+  const shouldShowFloatingButton = (isInitialLoad || isTabScreen) && !shouldHideFloatingButton;
 
   return (
     <View style={{ flex: 1 }}>
@@ -24,11 +38,27 @@ export default function RootLayout() {
             gestureDirection: 'horizontal',
           }} 
         />
+        <Stack.Screen 
+          name="nutrition" 
+          options={{ 
+            headerShown: false,
+            presentation: 'card',
+            animation: 'slide_from_right',
+          }} 
+        />
+        <Stack.Screen 
+          name="settings" 
+          options={{ 
+            headerShown: false,
+            presentation: 'card',
+            animation: 'slide_from_right',
+          }} 
+        />
         <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
       </Stack>
       
-      {/* 플로팅 채팅 버튼과 말풍선 */}
-      { !isChatOpen && (
+      {/* 플로팅 채팅 버튼과 말풍선 - 탭 화면에서만 표시 (특정 화면 제외) */}
+      { shouldShowFloatingButton && (
         <View style={styles.floatingContainer}>
           {/* 말풍선 안내 */}
           <View style={styles.speechBubble}>

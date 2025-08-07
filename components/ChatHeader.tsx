@@ -11,9 +11,9 @@ export const ChatHeader = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // 영양소 분석 페이지로 이동
-  const navigateToNutrition = () => {
-    router.push('/nutrition');
+  // 설정 페이지로 이동
+  const navigateToSettings = () => {
+    router.push('/settings');
   };
 
   return (
@@ -29,22 +29,17 @@ export const ChatHeader = () => {
         </View>
         
         <View style={styles.rightSection}>
-          <TouchableOpacity style={styles.settingsButton}>
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={navigateToSettings}
+          >
             <Image
-              source={require('../../assets/settings.svg')}
-              style={styles.settingsIcon}
+              source={require('../assets/settings.svg')}
+              style={[styles.settingsIcon, { width: 30, height: 30 }]}
               contentFit="contain"
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>챗봇</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={navigateToNutrition}
-          >
-            <Text style={styles.headerButtonText}>영양소 분석</Text>
-          </TouchableOpacity>
+          
           <TouchableOpacity onPress={() => router.back()} style={styles.closeButtonContainer}>
             <Text style={styles.closeButton}>✕</Text>
           </TouchableOpacity>

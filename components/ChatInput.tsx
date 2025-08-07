@@ -1,10 +1,10 @@
-// components/ChatInput.tsx
+// components/ChatInput.tsx - 단순한 키보드 대응
 import React from 'react';
 import {
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isSmallScreen, styles } from '../styles/chatStyles';
@@ -28,12 +28,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
 
+  // 단순한 위치 계산 (애니메이션 없이 즉시 적용)
+  const bottomPosition = isKeyboardVisible ? keyboardHeight + 10 : 0;
+
   return (
     <View style={[
       styles.inputContainer,
       { 
-        bottom: isKeyboardVisible ? keyboardHeight + 30 : 0,
-        paddingBottom: isKeyboardVisible ? 15 : Math.max(insets.bottom, 10),
+        bottom: bottomPosition,
+        paddingBottom: Math.max(insets.bottom, 10),
       }
     ]}>
       <View style={styles.inputWrapper}>

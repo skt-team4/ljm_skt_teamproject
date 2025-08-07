@@ -1,7 +1,7 @@
 // hooks/useChatLogic.ts
 import { useEffect, useState } from 'react';
 import { BackHandler, Keyboard } from 'react-native';
-import { getCategoryRecommendation, MealCategory, Message, sendChatMessage } from '../services/apiService';
+import { Message, sendChatMessage } from '../services/apiService';
 
 export const useChatLogic = () => {
   const [inputText, setInputText] = useState('');
@@ -14,7 +14,7 @@ export const useChatLogic = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // 키보드 이벤트 리스너
+  // 간단한 키보드 이벤트 리스너 (애니메이션 없이)
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
@@ -23,13 +23,12 @@ export const useChatLogic = () => {
         setKeyboardHeight(e.endCoordinates.height);
       }
     );
+    
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
-        setTimeout(() => {
-          setIsKeyboardVisible(false);
-          setKeyboardHeight(0);
-        }, 100);
+        setIsKeyboardVisible(false);
+        setKeyboardHeight(0);
       }
     );
 
@@ -64,65 +63,8 @@ export const useChatLogic = () => {
     );
   };
 
-  // 카테고리 버튼 클릭 처리
-  const handleCategoryPress = async (category: MealCategory) => {
-    setIsLoading(true);
-    setApiError(null);
-    
-    // 로딩 중 애니메이션 변경
-    setCurrentGifIndex(1); // yammi_think.gif
-    
-    try {
-      const response = await getCategoryRecommendation(category);
-      
-      if (response.success) {
-        setCurrentResponse(response.message);
-        setShowResponse(true);
-        
-        // 메시지 히스토리에 추가
-        const newMessage: Message = {
-          id: Date.now().toString(),
-          text: response.message,
-          isUser: false,
-          timestamp: new Date(),
-          category: category,
-        };
-        setMessages(prev => [...prev, newMessage]);
-        
-        // 카테고리에 따라 다른 애니메이션
-        switch (category) {
-          case 'distance':
-            setCurrentGifIndex(2); // yammi_waiting.gif
-            break;
-          case 'cost':
-            setCurrentGifIndex(3); // yammi_tmp.gif
-            break;
-          case 'preference':
-            setCurrentGifIndex(0); // yammi_welcome.gif
-            break;
-          case 'allergy':
-            setCurrentGifIndex(1); // yammi_think.gif
-            break;
-          default:
-            setCurrentGifIndex(0);
-        }
-      } else {
-        // API 오류 처리
-        setApiError(response.error || '알 수 없는 오류가 발생했습니다.');
-        setCurrentResponse(response.message);
-        setShowResponse(true);
-        setCurrentGifIndex(0); // 기본 애니메이션
-      }
-    } catch (error) {
-      console.error('카테고리 처리 오류:', error);
-      setApiError('네트워크 오류가 발생했습니다.');
-      setCurrentResponse('죄송해요, 일시적으로 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.');
-      setShowResponse(true);
-      setCurrentGifIndex(0);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // 카테고리 버튼 클릭 처리 함수 제거됨
+  // const handleCategoryPress = async (category: MealCategory) => { ... }
 
   // 텍스트 입력으로 질문하기
   const handleSendMessage = async () => {
@@ -217,7 +159,7 @@ export const useChatLogic = () => {
     
     // Handlers
     handleGifClick,
-    handleCategoryPress,
+    // handleCategoryPress 제거됨
     handleSendMessage,
     handleBackToMenu,
     handleRetry,
