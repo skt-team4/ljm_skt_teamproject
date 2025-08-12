@@ -3,14 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -77,6 +77,16 @@ const SHOP_ITEMS: CharacterItem[] = [
     category: 'action',
     unlocked: false,
   },
+  {
+    id: 'sunglass',
+    name: '선글라스',
+    description: '멋진 선글라스 착용',
+    gifSource: require('../assets/Sunglass.gif'),
+    staticSource: require('../assets/Sunglass.gif'),
+    price: 200, // 기본 무료
+    category: 'special',
+    unlocked: true,
+  },
 ];
 
 const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
@@ -87,7 +97,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
   isAnimationEnabled,
 }) => {
   const [coins, setCoins] = useState(1000); // 초기 코인
-  const [ownedItems, setOwnedItems] = useState<string[]>(['hi']); // 보유 아이템 (기본으로 hi 보유)
+  const [ownedItems, setOwnedItems] = useState<string[]>(['sunglass', 'hi']); // 보유 아이템 (기본으로 sunglass, hi 보유)
   const [selectedCategory, setSelectedCategory] = useState<'emotion' | 'action' | 'special'>('emotion');
 
   // 데이터 로드
@@ -127,10 +137,17 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
 
   // 아이템 구매
   const handlePurchase = (item: CharacterItem, itemIndex: number) => {
+    console.log('=== 디버깅 정보 ===');
+    console.log('클릭한 아이템:', item.name, '(id:', item.id, ')');
+    console.log('전달받은 itemIndex:', itemIndex);
+    console.log('현재 화면의 currentGifIndex:', currentGifIndex);
+    console.log('SHOP_ITEMS에서 실제 위치:', SHOP_ITEMS.findIndex(shopItem => shopItem.id === item.id));
+    console.log('==================');
+    
     if (ownedItems.includes(item.id)) {
-      // 이미 보유한 아이템은 사용
+      // 이미 보유한 아이템은 바로 사용 (팝업 제거)
+      console.log('아이템 적용:', itemIndex);
       onGifChange(itemIndex);
-      Alert.alert('적용 완료', `${item.name} 모션을 적용했습니다!`);
       return;
     }
 
@@ -154,10 +171,9 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
             setOwnedItems(newOwnedItems);
             saveUserData(newCoins, newOwnedItems);
             
-            // 구매 후 바로 적용
+            // 구매 후 바로 적용 (팝업 제거)
+            console.log('구매 후 아이템 적용:', itemIndex);
             onGifChange(itemIndex);
-            
-            Alert.alert('구매 완료!', `${item.name}을(를) 구매하고 적용했습니다!`);
           },
         },
       ]
@@ -191,8 +207,10 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
   // 아이템 카드 렌더링
   const renderItemCard = (item: CharacterItem, index: number) => {
     const isOwned = ownedItems.includes(item.id);
-    const isSelected = currentGifIndex === index;
     const realIndex = SHOP_ITEMS.findIndex(shopItem => shopItem.id === item.id);
+    const isSelected = currentGifIndex === realIndex; // realIndex로 비교
+
+    console.log(`렌더링: ${item.name}, 필터인덱스: ${index}, 실제인덱스: ${realIndex}, 선택됨: ${isSelected}`);
 
     return (
       <TouchableOpacity
@@ -202,7 +220,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
           isSelected && styles.itemCardSelected,
           isOwned && styles.itemCardOwned,
         ]}
-        onPress={() => handlePurchase(item, realIndex)}
+        onPress={() => handlePurchase(item, realIndex)} // realIndex 전달
       >
         {/* 아이템 이미지 */}
         <View style={styles.itemImageContainer}>

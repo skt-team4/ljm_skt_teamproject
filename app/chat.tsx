@@ -18,7 +18,7 @@ import CharacterShopModal from '../components/CharacterShopModal'; // 상점 모
 import { ChatHeader } from '../components/ChatHeader';
 import { ChatInput } from '../components/ChatInput';
 import { SpeechBubble } from '../components/SpeechBubble';
-import { useChatLogic } from '../hooks/useChatLogic';
+import useChatLogic from '../hooks/useChatLogic'; // 기본 import로 변경
 import { isSmallScreen, SCREEN_HEIGHT, styles } from '../styles/chatStyles';
 
 // GIF 애니메이션 배열
@@ -27,6 +27,7 @@ const gifAnimations = [
   require('../assets/Sad.gif'),
   require('../assets/Dance.gif'),
   require('../assets/Jump.gif'),
+  require('../assets/Sunglass.gif'),
 ];
 
 // 정적 이미지 배열 (애니메이션 비활성화 시 사용)
@@ -35,6 +36,7 @@ const staticImages = [
   require('../assets/Sad.gif'),
   require('../assets/Dance.gif'), 
   require('../assets/Jump.gif'),
+  require('../assets/Sunglass.gif'),
 ];
 
 // Expo Router 옵션
@@ -71,7 +73,7 @@ export default function ChatScreen() {
     new Animated.Value(0),
   ]);
 
-  // 커스텀 훅에서 로직 가져오기
+  // 커스텀 훅에서 로직 가져오기 (handleGifClick 제외)
   const {
     inputText,
     setInputText,
@@ -86,7 +88,10 @@ export default function ChatScreen() {
     handleSendMessage,
     handleBackToMenu,
     handleRetry,
-  } = useChatLogic();
+    handleGifChange, // 상점용 GIF 변경 핸들러 (훅에서 가져옴)
+    awardCoins, // 코인 보상 함수 (훅에서 가져옴)
+    // handleGifClick은 여기서 덮어쓸 예정이므로 가져오지 않음
+  } = useChatLogic(); // 기본 import 사용
 
   // 화면이 포커스될 때마다 애니메이션 설정 다시 로드
   useFocusEffect(
@@ -123,33 +128,31 @@ export default function ChatScreen() {
 
   // GIF 클릭 핸들러 - 상점 모달 열기
   const handleGifClick = () => {
+    console.log('GIF 클릭됨, 현재 인덱스:', currentGifIndex);
     setShowShopModal(true);
   };
 
-  // GIF 변경 핸들러 (상점에서 선택시)
-  const handleGifChange = (newIndex: number) => {
-    setCurrentGifIndex(newIndex);
-    // 코인 보상 (액션 수행시)
-    awardCoins(5, '캐릭터 변경');
-  };
-
-  // 코인 보상 시스템
-  const awardCoins = async (amount: number, reason: string) => {
-    try {
-      const savedCoins = await AsyncStorage.getItem('userCoins');
-      const currentCoins = savedCoins ? parseInt(savedCoins, 10) : 1000;
-      const newCoins = currentCoins + amount;
-      
-      await AsyncStorage.setItem('userCoins', newCoins.toString());
-      
-      // 선택적으로 알림 표시 (너무 빈번하지 않게)
-      if (Math.random() < 0.3) { // 30% 확률로만 알림
-        console.log(`+${amount} 코인! (${reason})`);
-      }
-    } catch (error) {
-      console.error('코인 보상 실패:', error);
+  // GIF 변경 시 콘솔 로그 추가 (디버깅용)
+  const handleGifChangeWithLog = (newIndex: number) => {
+    console.log(`[Chat] GIF 변경 요청: ${currentGifIndex} -> ${newIndex}`);
+    console.log(`[Chat] gifAnimations 배열 길이: ${gifAnimations.length}`);
+    console.log(`[Chat] 요청된 인덱스 ${newIndex}의 GIF:`, gifAnimations[newIndex] ? '존재' : 'undefined');
+    
+    // 인덱스가 유효한지 확인
+    if (newIndex >= 0 && newIndex < gifAnimations.length && gifAnimations[newIndex]) {
+      handleGifChange(newIndex);
+    } else {
+      console.error(`[Chat] 유효하지 않은 GIF 인덱스: ${newIndex}`);
+      // 기본값으로 0번 인덱스 사용
+      handleGifChange(0);
     }
   };
+
+  // currentGifIndex 변경 감지 (디버깅용)
+  useEffect(() => {
+    console.log(`[Chat] currentGifIndex 변경됨: ${currentGifIndex}`);
+    console.log(`[Chat] 현재 표시될 GIF:`, gifAnimations[currentGifIndex]);
+  }, [currentGifIndex]);
 
   // 메시지 전송시 코인 보상
   const handleSendMessageWithReward = (message: string) => {
@@ -393,13 +396,17 @@ export default function ChatScreen() {
             {/* 캐릭터 클릭 안내 텍스트 - GIF 바로 위 */}
             <View style={styles.characterGuideContainer}>
               <Text style={styles.characterGuideText}>
-                ✨ 나비얌이를 클릭해서 꾸며보세요!
+                ✨ 캐릭터를 클릭해서 꾸며보세요!
               </Text>
             </View>
 
             <TouchableOpacity onPress={handleGifClick} activeOpacity={0.8}>
               <Image
-                source={isAnimationEnabled ? gifAnimations[currentGifIndex] : staticImages[currentGifIndex]}
+                source={
+                  isAnimationEnabled 
+                    ? (gifAnimations[currentGifIndex] || gifAnimations[0]) 
+                    : (staticImages[currentGifIndex] || staticImages[0])
+                }
                 style={dynamicStyles.characterGif}
                 contentFit="contain"
                 transition={isAnimationEnabled ? 1000 : 0} // 애니메이션 비활성화 시 전환 효과 제거
@@ -424,7 +431,7 @@ export default function ChatScreen() {
         visible={showShopModal}
         onClose={() => setShowShopModal(false)}
         currentGifIndex={currentGifIndex}
-        onGifChange={handleGifChange}
+        onGifChange={handleGifChangeWithLog} // 디버깅용 래퍼 함수 사용
         isAnimationEnabled={isAnimationEnabled}
       />
     </View>

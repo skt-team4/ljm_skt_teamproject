@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { BackHandler, Keyboard } from 'react-native';
 import { Message, sendChatMessage } from '../services/apiService';
 
-export const useChatLogic = () => {
+// 기본 export로 변경
+const useChatLogic = () => {
   const [inputText, setInputText] = useState('');
   const [currentResponse, setCurrentResponse] = useState('');
   const [showResponse, setShowResponse] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [currentGifIndex, setCurrentGifIndex] = useState(0);
+  const [currentGifIndex, setCurrentGifIndex] = useState(0); // 기본값을 0 (Sunglass)으로 설정
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export const useChatLogic = () => {
   // GIF 클릭 핸들러 (기존과 동일하게 유지 - 상점은 별도 처리)
   const handleGifClick = () => {
     setCurrentGifIndex((prevIndex) => 
-      (prevIndex + 1) % 4 // gifAnimations.length
+      (prevIndex + 1) % 5 // 5개 GIF로 업데이트 (sunglass, hi, sad, dance, jump)
     );
     
     // GIF 변경시 코인 보상
@@ -87,10 +88,17 @@ export const useChatLogic = () => {
 
   // 🎨 캐릭터 변경 핸들러 (상점에서 호출)
   const handleGifChange = (newIndex: number) => {
+    console.log(`[useChatLogic] 캐릭터 변경 요청: ${currentGifIndex} -> ${newIndex}`);
     setCurrentGifIndex(newIndex);
+    saveCharacterIndex(newIndex); // 선택한 캐릭터 저장
     
     // 상점에서 캐릭터 변경시 코인 보상
     awardCoins(5, '캐릭터 꾸미기');
+    
+    // 변경 후 확인
+    setTimeout(() => {
+      console.log(`[useChatLogic] 변경 완료 후 currentGifIndex: ${currentGifIndex}`);
+    }, 100);
   };
 
   // 텍스트 입력으로 질문하기 (코인 보상 추가)
@@ -115,7 +123,7 @@ export const useChatLogic = () => {
     setMessages(prev => [...prev, userMessageObj]);
     
     // 로딩 애니메이션
-    setCurrentGifIndex(1); // yammi_think.gif
+    setCurrentGifIndex(1); // Hi.gif (인덱스 1) - 로딩 중에는 인사하기
     
     try {
       const response = await sendChatMessage(userMessage);
@@ -135,7 +143,7 @@ export const useChatLogic = () => {
         setMessages(prev => [...prev, botMessage]);
         
         // 응답 후 애니메이션
-        setCurrentGifIndex(0); // yammi_welcome.gif
+        setCurrentGifIndex(0); // Sunglass.gif (기본 캐릭터 - 인덱스 0)
         
         // 💰 음식 추천 받기 코인 보상
         awardCoins(10, '음식 추천 요청');
@@ -198,10 +206,33 @@ export const useChatLogic = () => {
     }
   };
 
-  // 앱 시작시 매일 로그인 보상 체크
+  // 앱 시작시 매일 로그인 보상 체크 및 저장된 캐릭터 로드
   useEffect(() => {
     checkDailyLoginReward();
+    loadSavedCharacter();
   }, []);
+
+  // 저장된 캐릭터 인덱스 로드
+  const loadSavedCharacter = async () => {
+    try {
+      const savedIndex = await AsyncStorage.getItem('currentCharacterIndex');
+      if (savedIndex !== null) {
+        const index = parseInt(savedIndex, 10);
+        setCurrentGifIndex(index);
+      }
+    } catch (error) {
+      console.error('저장된 캐릭터 로드 실패:', error);
+    }
+  };
+
+  // 캐릭터 인덱스 저장
+  const saveCharacterIndex = async (index: number) => {
+    try {
+      await AsyncStorage.setItem('currentCharacterIndex', index.toString());
+    } catch (error) {
+      console.error('캐릭터 인덱스 저장 실패:', error);
+    }
+  };
 
   return {
     // State
@@ -227,5 +258,9 @@ export const useChatLogic = () => {
     // 🆕 코인 시스템
     awardCoins,
     checkDailyLoginReward,
+    loadSavedCharacter, // 캐릭터 로드 함수 추가
   };
-};
+  };
+
+// 기본 export
+export default useChatLogic;
