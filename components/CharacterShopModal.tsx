@@ -1,5 +1,4 @@
 // CharacterShopModal.tsx
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import {
@@ -12,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import StorageService from '../utils/storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -83,7 +83,7 @@ const SHOP_ITEMS: CharacterItem[] = [
     description: '멋진 선글라스 착용',
     gifSource: require('../assets/Sunglass.gif'),
     staticSource: require('../assets/Sunglass.gif'),
-    price: 200, // 기본 무료
+    price: 0, // 기본 무료 (수정: 200 -> 0)
     category: 'special',
     unlocked: true,
   },
@@ -96,9 +96,10 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
   onGifChange,
   isAnimationEnabled,
 }) => {
-  const [coins, setCoins] = useState(1000); // 초기 코인
-  const [ownedItems, setOwnedItems] = useState<string[]>(['sunglass', 'hi']); // 보유 아이템 (기본으로 sunglass, hi 보유)
+  const [coins, setCoins] = useState(1000); 
+  const [ownedItems, setOwnedItems] = useState<string[]>(['hi', 'sunglass']); // StorageService 기본값과 동일
   const [selectedCategory, setSelectedCategory] = useState<'emotion' | 'action' | 'special'>('emotion');
+  const [isLoading, setIsLoading] = useState(false);
 
   // 데이터 로드
   useEffect(() => {
@@ -107,55 +108,65 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
     }
   }, [visible]);
 
-  // 사용자 데이터 로드
+  // StorageService를 사용한 사용자 데이터 로드
   const loadUserData = async () => {
     try {
-      const savedCoins = await AsyncStorage.getItem('userCoins');
-      const savedItems = await AsyncStorage.getItem('ownedCharacterItems');
+      setIsLoading(true);
+      const userData = await StorageService.getUserData();
       
-      if (savedCoins) {
-        setCoins(parseInt(savedCoins, 10));
-      }
+      console.log('📦 CharacterShop - 데이터 로드:', {
+        coins: userData.coins,
+        items: userData.ownedItems
+      });
       
-      if (savedItems) {
-        setOwnedItems(JSON.parse(savedItems));
-      }
+      setCoins(userData.coins);
+      setOwnedItems(userData.ownedItems);
     } catch (error) {
-      console.error('사용자 데이터 로드 실패:', error);
+      console.error('❌ 사용자 데이터 로드 실패:', error);
+      Alert.alert('오류', '데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // 사용자 데이터 저장
-  const saveUserData = async (newCoins: number, newOwnedItems: string[]) => {
-    try {
-      await AsyncStorage.setItem('userCoins', newCoins.toString());
-      await AsyncStorage.setItem('ownedCharacterItems', JSON.stringify(newOwnedItems));
-    } catch (error) {
-      console.error('사용자 데이터 저장 실패:', error);
-    }
-  };
-
-  // 아이템 구매
-  const handlePurchase = (item: CharacterItem, itemIndex: number) => {
-    console.log('=== 디버깅 정보 ===');
-    console.log('클릭한 아이템:', item.name, '(id:', item.id, ')');
-    console.log('전달받은 itemIndex:', itemIndex);
-    console.log('현재 화면의 currentGifIndex:', currentGifIndex);
-    console.log('SHOP_ITEMS에서 실제 위치:', SHOP_ITEMS.findIndex(shopItem => shopItem.id === item.id));
-    console.log('==================');
+  // 아이템 구매 처리
+  const handlePurchase = async (item: CharacterItem, itemIndex: number) => {
+    console.log('🛒 구매 시도:', {
+      item: item.name,
+      id: item.id,
+      price: item.price,
+      itemIndex,
+      currentCoins: coins,
+      alreadyOwned: ownedItems.includes(item.id)
+    });
     
+    // 이미 보유한 아이템은 바로 사용
     if (ownedItems.includes(item.id)) {
-      // 이미 보유한 아이템은 바로 사용 (팝업 제거)
-      console.log('아이템 적용:', itemIndex);
+      console.log('✅ 보유 아이템 사용:', itemIndex);
       onGifChange(itemIndex);
       return;
     }
 
+    // 무료 아이템은 바로 사용
+    if (item.price === 0) {
+      console.log('🆓 무료 아이템 사용:', itemIndex);
+      try {
+        const newItems = await StorageService.addOwnedItem(item.id);
+        setOwnedItems(newItems);
+        onGifChange(itemIndex);
+      } catch (error) {
+        console.error('무료 아이템 추가 실패:', error);
+      }
+      return;
+    }
+
+    // 코인 부족 체크
     if (coins < item.price) {
       Alert.alert('코인 부족', '코인이 부족합니다. 게임을 플레이해서 코인을 모아보세요!');
       return;
     }
 
+    // 구매 확인 팝업
     Alert.alert(
       '아이템 구매',
       `${item.name}을(를) ${item.price} 코인으로 구매하시겠습니까?`,
@@ -163,21 +174,46 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
         { text: '취소', style: 'cancel' },
         {
           text: '구매',
-          onPress: () => {
-            const newCoins = coins - item.price;
-            const newOwnedItems = [...ownedItems, item.id];
-            
-            setCoins(newCoins);
-            setOwnedItems(newOwnedItems);
-            saveUserData(newCoins, newOwnedItems);
-            
-            // 구매 후 바로 적용 (팝업 제거)
-            console.log('구매 후 아이템 적용:', itemIndex);
-            onGifChange(itemIndex);
-          },
+          onPress: () => executePurchase(item, itemIndex),
         },
       ]
     );
+  };
+
+  // 실제 구매 실행
+  const executePurchase = async (item: CharacterItem, itemIndex: number) => {
+    try {
+      setIsLoading(true);
+      console.log('💳 구매 실행 중...', item.name);
+
+      const result = await StorageService.purchaseItem(item.id, item.price);
+      
+      if (result.success) {
+        console.log('✅ 구매 성공:', {
+          item: item.name,
+          newCoins: result.coins,
+          newItems: result.items
+        });
+
+        // UI 상태 업데이트
+        setCoins(result.coins);
+        setOwnedItems(result.items);
+        
+        // 구매한 아이템 바로 적용
+        onGifChange(itemIndex);
+        
+        // 성공 메시지
+        Alert.alert('구매 완료', `${item.name}을(를) 구매했습니다! 🎉`);
+      } else {
+        console.log('❌ 구매 실패:', { coins: result.coins, price: item.price });
+        Alert.alert('구매 실패', '구매 중 문제가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('💥 구매 오류:', error);
+      Alert.alert('오류', '구매 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // 카테고리별 아이템 필터링
@@ -188,11 +224,13 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
   // 카테고리 버튼 렌더링
   const renderCategoryButton = (category: 'emotion' | 'action' | 'special', label: string, emoji: string) => (
     <TouchableOpacity
+      key={category}
       style={[
         styles.categoryButton,
         selectedCategory === category && styles.categoryButtonSelected
       ]}
       onPress={() => setSelectedCategory(category)}
+      disabled={isLoading}
     >
       <Text style={styles.categoryEmoji}>{emoji}</Text>
       <Text style={[
@@ -208,9 +246,8 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
   const renderItemCard = (item: CharacterItem, index: number) => {
     const isOwned = ownedItems.includes(item.id);
     const realIndex = SHOP_ITEMS.findIndex(shopItem => shopItem.id === item.id);
-    const isSelected = currentGifIndex === realIndex; // realIndex로 비교
-
-    console.log(`렌더링: ${item.name}, 필터인덱스: ${index}, 실제인덱스: ${realIndex}, 선택됨: ${isSelected}`);
+    const isSelected = currentGifIndex === realIndex;
+    const isFree = item.price === 0;
 
     return (
       <TouchableOpacity
@@ -219,8 +256,10 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
           styles.itemCard,
           isSelected && styles.itemCardSelected,
           isOwned && styles.itemCardOwned,
+          isLoading && styles.itemCardDisabled,
         ]}
-        onPress={() => handlePurchase(item, realIndex)} // realIndex 전달
+        onPress={() => handlePurchase(item, realIndex)}
+        disabled={isLoading}
       >
         {/* 아이템 이미지 */}
         <View style={styles.itemImageContainer}>
@@ -243,6 +282,13 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
               <Text style={styles.ownedBadgeText}>보유</Text>
             </View>
           )}
+
+          {/* 무료 표시 */}
+          {!isOwned && isFree && (
+            <View style={styles.freeBadge}>
+              <Text style={styles.freeBadgeText}>무료</Text>
+            </View>
+          )}
         </View>
 
         {/* 아이템 정보 */}
@@ -256,10 +302,12 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
               <Text style={styles.ownedText}>
                 {isSelected ? '사용중' : '보유함'}
               </Text>
+            ) : isFree ? (
+              <Text style={styles.freeText}>무료</Text>
             ) : (
               <View style={styles.priceRow}>
                 <Text style={styles.coinIcon}>🪙</Text>
-                <Text style={styles.itemPrice}>{item.price}</Text>
+                <Text style={styles.itemPrice}>{item.price.toLocaleString()}</Text>
               </View>
             )}
           </View>
@@ -278,13 +326,19 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
       <View style={styles.modalContainer}>
         {/* 헤더 */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity 
+            onPress={onClose} 
+            style={styles.closeButton}
+            disabled={isLoading}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
           
           <View style={styles.titleContainer}>
             <Text style={styles.title}>캐릭터 상점</Text>
-            <Text style={styles.subtitle}>나비얌이를 꾸며보세요!</Text>
+            <Text style={styles.subtitle}>
+              {isLoading ? '로딩 중...' : '나비얌이를 꾸며보세요!'}
+            </Text>
           </View>
           
           {/* 코인 표시 */}
@@ -306,6 +360,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isLoading}
         >
           <View style={styles.itemGrid}>
             {getFilteredItems().map((item, index) => renderItemCard(item, index))}
@@ -317,10 +372,20 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
             <Text style={styles.coinGuideText}>
               • 매일 로그인: 50 코인{'\n'}
               • 음식 추천 받기: 10 코인{'\n'}
-              • 친구와 대화하기: 5 코인
+              • 친구와 대화하기: 5 코인{'\n'}
+              • 첫 로그인 보너스: 500 코인
             </Text>
           </View>
         </ScrollView>
+
+        {/* 로딩 오버레이 */}
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>처리 중...</Text>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -457,6 +522,9 @@ const styles = StyleSheet.create({
   itemCardOwned: {
     borderColor: '#28a745',
   },
+  itemCardDisabled: {
+    opacity: 0.7,
+  },
   itemImageContainer: {
     position: 'relative',
     alignItems: 'center',
@@ -494,6 +562,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
+  freeBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#17a2b8',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  freeBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   itemInfo: {
     alignItems: 'center',
   },
@@ -526,6 +608,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#28a745',
   },
+  freeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#17a2b8',
+  },
   coinGuideContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -544,6 +631,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
 });
 

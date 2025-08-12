@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
@@ -16,15 +16,6 @@ export default function HomeScreen() {
             <Text style={styles.appTitle}>YUM:AI</Text>
             <Text style={styles.appSubtitle}>오늘도 맛있는 하루 되세요!</Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => router.push('/profile')}
-            style={styles.profileContainer}
-          >
-            <Image
-              source={{ uri: 'https://picsum.photos/seed/696/300/300' }}
-              style={styles.profileIcon}
-            />
-          </TouchableOpacity>
         </View>
 
         {/* 메인 배너 */}
