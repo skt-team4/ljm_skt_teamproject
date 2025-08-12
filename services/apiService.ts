@@ -20,14 +20,26 @@ export type Message = {
   category?: string;
 };
 
+// 환경 변수에서 API 키 가져오기
+const getApiKey = (): string => {
+  // Expo 환경 변수 (EXPO_PUBLIC_ 접두사 사용)
+  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    console.error('⚠️ OpenAI API 키가 설정되지 않았습니다. .env 파일에 EXPO_PUBLIC_OPENAI_API_KEY를 설정해주세요.');
+    return '';
+  }
+  
+  return apiKey;
+};
+
 // OpenAI API 설정
 const API_CONFIG = {
   openai: {
     baseUrl: 'https://api.openai.com/v1/chat/completions',
-    apiKey: 'api_key', // 실제 OpenAI API 키로 변경 필요
-    model: 'gpt-3.5-turbo',
+    model: process.env.EXPO_PUBLIC_OPENAI_MODEL || 'gpt-3.5-turbo',
   },
-  timeout: 15000, // 15초 타임아웃
+  timeout: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '15000'), // 기본 15초
 };
 
 // 카테고리별 시스템 프롬프트 생성
@@ -50,11 +62,22 @@ const getCategoryPrompt = (category?: MealCategory) => {
 // OpenAI API를 통한 챗봇 메시지 전송
 export async function sendChatMessage(message: string, category?: MealCategory): Promise<ApiResponse> {
   try {
+    const apiKey = getApiKey();
+    
+    // API 키가 없으면 에러 반환
+    if (!apiKey) {
+      return {
+        success: false,
+        message: '⚠️ API 키가 설정되지 않았어요. 설정을 확인해주세요.',
+        error: 'API key not found',
+      };
+    }
+
     const response = await fetch(API_CONFIG.openai.baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_CONFIG.openai.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: API_CONFIG.openai.model,

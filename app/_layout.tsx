@@ -72,7 +72,7 @@ export default function RootLayout() {
             onPress={() => router.push('/chat')}
           >
             <Image
-              source={require('../assets/images/chat-button.png')}
+              source={require('../assets/그르시.png')}
               style={styles.chatButtonImage}
               resizeMode="contain"
             />
@@ -126,10 +126,10 @@ const styles = StyleSheet.create({
     borderTopColor: 'white',
   },
   floatingButton: { 
-    width: 60, 
-    height: 60, 
-    backgroundColor: 'transparent',
-    borderRadius: 30, 
+    width: 75,  // 60 → 75로 증가
+    height: 75, // 60 → 75로 증가
+    backgroundColor: 'white', // 투명 → 흰색으로 변경
+    borderRadius: 37.5, // 30 → 37.5로 증가 (width/2)
     justifyContent: 'center', 
     alignItems: 'center', 
     elevation: 8, 
@@ -137,9 +137,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+    // 완전한 원형 클리핑으로 네모 모서리 제거
+    overflow: 'hidden',
   },
   chatButtonImage: {
-    width: 80,
-    height: 80,
+    width: 105,  // 95 → 70으로 줄여서 원 안에 완전히 들어가도록
+    height: 105, // 95 → 70으로 줄여서 원 안에 완전히 들어가도록
+    // 이미지도 원형으로 클리핑
+    borderRadius: 35,
   },
 });

@@ -45,7 +45,7 @@ interface AllergyItem {
 
 // 사용 가능한 추천 카테고리들
 const AVAILABLE_CATEGORIES: RecommendationCategory[] = [
-  { id: 'korean', name: '한식', emoji: '🍚', description: '김치찌개, 비빔밥, bulgogi 등' },
+  { id: 'korean', name: '한식', emoji: '🍚', description: '김치찌개, 비빔밥, 불고기 등' },
   { id: 'chinese', name: '중식', emoji: '🥢', description: '짜장면, 탕수육, 마라탕 등' },
   { id: 'japanese', name: '일식', emoji: '🍣', description: '초밥, 라멘, 돈가스 등' },
   { id: 'western', name: '양식', emoji: '🍝', description: '파스타, 스테이크, 피자 등' },

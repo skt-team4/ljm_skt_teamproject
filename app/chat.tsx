@@ -1,7 +1,9 @@
-// chat.tsx - 완전히 수정된 버전
+// chat.tsx - 캐릭터 상점 연동 버전
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Animated,
   ScrollView,
@@ -12,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // 분리된 파일들 import
+import CharacterShopModal from '../components/CharacterShopModal'; // 상점 모달 import
 import { ChatHeader } from '../components/ChatHeader';
 import { ChatInput } from '../components/ChatInput';
 import { SpeechBubble } from '../components/SpeechBubble';
@@ -20,10 +23,18 @@ import { isSmallScreen, SCREEN_HEIGHT, styles } from '../styles/chatStyles';
 
 // GIF 애니메이션 배열
 const gifAnimations = [
-  require('../assets/yammi_welcome.gif'),
-  require('../assets/yammi_think.gif'),
-  require('../assets/yammi_waiting.gif'),
-  require('../assets/yammi_tmp.gif'),
+  require('../assets/Hi.gif'),
+  require('../assets/Sad.gif'),
+  require('../assets/Dance.gif'),
+  require('../assets/Jump.gif'),
+];
+
+// 정적 이미지 배열 (애니메이션 비활성화 시 사용)
+const staticImages = [
+  require('../assets/Hi.gif'), // 첫 번째 프레임만 사용
+  require('../assets/Sad.gif'),
+  require('../assets/Dance.gif'), 
+  require('../assets/Jump.gif'),
 ];
 
 // Expo Router 옵션
@@ -40,6 +51,12 @@ export default function ChatScreen() {
   const [showLoading, setShowLoading] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
   
+  // 애니메이션 설정 상태
+  const [isAnimationEnabled, setIsAnimationEnabled] = useState(true);
+  
+  // 상점 모달 상태
+  const [showShopModal, setShowShopModal] = useState(false);
+  
   // 애니메이션 값들 (초기 로딩용)
   const [animValues] = useState([
     new Animated.Value(0),
@@ -47,7 +64,7 @@ export default function ChatScreen() {
     new Animated.Value(0),
   ]);
 
-  // API 로딩 애니메이션 값들
+  // API 로딩 애니메이션 값들 - SpeechBubble로 전달
   const [apiLoadingAnimValues] = useState([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -63,16 +80,90 @@ export default function ChatScreen() {
     isKeyboardVisible,
     keyboardHeight,
     currentGifIndex,
+    setCurrentGifIndex, // GIF 변경을 위한 setter 추가
     isLoading,
     apiError,
-    handleGifClick,
     handleSendMessage,
     handleBackToMenu,
     handleRetry,
   } = useChatLogic();
 
+  // 화면이 포커스될 때마다 애니메이션 설정 다시 로드
+  useFocusEffect(
+    useCallback(() => {
+      loadAnimationSettings();
+    }, [])
+  );
+
+  // 애니메이션 설정 불러오기 및 실시간 감지
+  useEffect(() => {
+    loadAnimationSettings();
+    
+    // 설정 변경을 실시간으로 감지하는 인터벌 설정
+    const interval = setInterval(() => {
+      loadAnimationSettings();
+    }, 1000); // 1초마다 체크
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadAnimationSettings = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('animationEnabled');
+      if (saved !== null) {
+        const enabled = JSON.parse(saved);
+        if (enabled !== isAnimationEnabled) {
+          setIsAnimationEnabled(enabled);
+        }
+      }
+    } catch (error) {
+      console.error('애니메이션 설정 불러오기 실패:', error);
+    }
+  };
+
+  // GIF 클릭 핸들러 - 상점 모달 열기
+  const handleGifClick = () => {
+    setShowShopModal(true);
+  };
+
+  // GIF 변경 핸들러 (상점에서 선택시)
+  const handleGifChange = (newIndex: number) => {
+    setCurrentGifIndex(newIndex);
+    // 코인 보상 (액션 수행시)
+    awardCoins(5, '캐릭터 변경');
+  };
+
+  // 코인 보상 시스템
+  const awardCoins = async (amount: number, reason: string) => {
+    try {
+      const savedCoins = await AsyncStorage.getItem('userCoins');
+      const currentCoins = savedCoins ? parseInt(savedCoins, 10) : 1000;
+      const newCoins = currentCoins + amount;
+      
+      await AsyncStorage.setItem('userCoins', newCoins.toString());
+      
+      // 선택적으로 알림 표시 (너무 빈번하지 않게)
+      if (Math.random() < 0.3) { // 30% 확률로만 알림
+        console.log(`+${amount} 코인! (${reason})`);
+      }
+    } catch (error) {
+      console.error('코인 보상 실패:', error);
+    }
+  };
+
+  // 메시지 전송시 코인 보상
+  const handleSendMessageWithReward = (message: string) => {
+    handleSendMessage(message);
+    awardCoins(10, '음식 추천 요청');
+  };
+
   // 점 애니메이션 생성 함수
   const createBounceAnimation = (animValues: Animated.Value[], shouldLoop = true) => {
+    // 애니메이션이 비활성화되면 애니메이션 실행하지 않음
+    if (!isAnimationEnabled) {
+      return animValues.map(() => ({ start: () => {}, stop: () => {} }));
+    }
+
     const createSingleBounceAnimation = (animValue: Animated.Value, delay: number) => {
       const animation = Animated.sequence([
         Animated.delay(delay),
@@ -98,7 +189,7 @@ export default function ChatScreen() {
 
   // 초기 로딩 애니메이션
   useEffect(() => {
-    if (showLoading) {
+    if (showLoading && isAnimationEnabled) {
       const animations = createBounceAnimation(animValues, true);
       animations.forEach(anim => anim.start());
 
@@ -113,12 +204,20 @@ export default function ChatScreen() {
         clearTimeout(timer);
         animations.forEach(anim => anim.stop());
       };
-    }
-  }, [showLoading, animValues]);
+    } else if (showLoading && !isAnimationEnabled) {
+      // 애니메이션 비활성화 시 즉시 메시지 표시
+      const timer = setTimeout(() => {
+        setShowLoading(false);
+        setShowMessage(true);
+      }, 300); // 짧은 딜레이만 적용
 
-  // API 로딩 애니메이션
+      return () => clearTimeout(timer);
+    }
+  }, [showLoading, animValues, isAnimationEnabled]);
+
+  // API 로딩 애니메이션 - 말풍선이 보이고 로딩중일 때만 실행
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading && showResponse && isAnimationEnabled) {
       const animations = createBounceAnimation(apiLoadingAnimValues, true);
       animations.forEach(anim => anim.start());
 
@@ -132,36 +231,58 @@ export default function ChatScreen() {
         animValue.setValue(0);
       });
     }
-  }, [isLoading, apiLoadingAnimValues]);
+  }, [isLoading, showResponse, apiLoadingAnimValues, isAnimationEnabled]);
 
-  // 점 애니메이션 컴포넌트
+  // 점 애니메이션 컴포넌트 (초기 로딩용)
   const LoadingDots = ({ animationValues, loadingText }: { 
     animationValues: Animated.Value[], 
     loadingText: string 
   }) => (
     <View style={{ alignItems: 'center' }}>
-      {/* 세 개의 점이 튀는 애니메이션 */}
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center',
-        marginBottom: 10 
-      }}>
-        {animationValues.map((animValue, index) => (
-          <Animated.View
-            key={index}
-            style={[
-              {
+      {/* 애니메이션이 활성화된 경우에만 점 애니메이션 표시 */}
+      {isAnimationEnabled ? (
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center',
+          marginBottom: 10 
+        }}>
+          {animationValues.map((animValue, index) => (
+            <Animated.View
+              key={index}
+              style={[
+                {
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: '#FFBF00',
+                  marginHorizontal: 4,
+                  transform: [{ translateY: animValue }]
+                }
+              ]}
+            />
+          ))}
+        </View>
+      ) : (
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center',
+          marginBottom: 10 
+        }}>
+          {/* 정적인 점들 */}
+          {[0, 1, 2].map((index) => (
+            <View
+              key={index}
+              style={{
                 width: 12,
                 height: 12,
                 borderRadius: 6,
                 backgroundColor: '#FFBF00',
                 marginHorizontal: 4,
-                transform: [{ translateY: animValue }]
-              }
-            ]}
-          />
-        ))}
-      </View>
+              }}
+            />
+          ))}
+        </View>
+      )}
       
       <Text style={[
         dynamicStyles.welcomeText,
@@ -180,8 +301,8 @@ export default function ChatScreen() {
     },
     characterGif: {
       ...styles.characterGif,
-      width: isSmallScreen ? 200 : 280,
-      height: isSmallScreen ? 200 : 280,
+      width: isSmallScreen ? 300 : 350, 
+      height: isSmallScreen ? 300 : 350,
     },
   };
 
@@ -194,15 +315,18 @@ export default function ChatScreen() {
 
       {/* 메인 컨텐츠 */}
       <View style={styles.mainContainer}>
-        {/* 말풍선 컴포넌트 */}
+        {/* 말풍선 컴포넌트 - 로딩 애니메이션 props 추가 */}
         <SpeechBubble
           isVisible={showResponse}
-          isKeyboardVisible={false}
+          isKeyboardVisible={isKeyboardVisible}
           currentResponse={currentResponse}
           isLoading={isLoading}
           apiError={apiError}
           onClose={handleBackToMenu}
           onRetry={handleRetry}
+          // 로딩 애니메이션을 위한 추가 props
+          apiLoadingAnimValues={apiLoadingAnimValues}
+          isAnimationEnabled={isAnimationEnabled}
         />
 
         <ScrollView 
@@ -228,23 +352,18 @@ export default function ChatScreen() {
           ]}>
             {!showResponse && (
               <>
-                <Text style={dynamicStyles.welcomeText}>안녕하세요! 얌이에요! 🍽️</Text>
+                <Text style={dynamicStyles.welcomeText}>안녕하세요!!</Text>
                 
-                {/* 로딩 상태에 따른 애니메이션 표시 */}
+                {/* 초기 로딩만 여기서 표시, API 로딩은 말풍선으로 이동 */}
                 <View style={{ 
                   alignItems: 'center', 
                   justifyContent: 'center',
                   minHeight: 60 
                 }}>
-                  {showLoading && !isLoading ? (
+                  {showLoading ? (
                     <LoadingDots 
                       animationValues={animValues} 
                       loadingText="추천을 준비중..."
-                    />
-                  ) : isLoading ? (
-                    <LoadingDots 
-                      animationValues={apiLoadingAnimValues} 
-                      loadingText="맛있는 추천을 준비중..."
                     />
                   ) : (
                     <Text style={[
@@ -255,7 +374,7 @@ export default function ChatScreen() {
                         textAlign: 'center'
                       }
                     ]}>
-                      오늘은 "치킨" 어때요? 🍚
+                      오늘은 "치킨" 어때요? 
                     </Text>
                   )}
                 </View>
@@ -263,22 +382,27 @@ export default function ChatScreen() {
             )}
           </View>
 
-          {/* 카테고리 버튼 컴포넌트 제거됨 */}
-
           {/* 캐릭터 애니메이션 */}
           <View style={[
             styles.characterContainer,
             { 
               minHeight: isSmallScreen ? 150 : 200,
-              marginTop: 120,
+              marginTop: 30,
             }
           ]}>
+            {/* 캐릭터 클릭 안내 텍스트 - GIF 바로 위 */}
+            <View style={styles.characterGuideContainer}>
+              <Text style={styles.characterGuideText}>
+                ✨ 나비얌이를 클릭해서 꾸며보세요!
+              </Text>
+            </View>
+
             <TouchableOpacity onPress={handleGifClick} activeOpacity={0.8}>
               <Image
-                source={gifAnimations[currentGifIndex]}
+                source={isAnimationEnabled ? gifAnimations[currentGifIndex] : staticImages[currentGifIndex]}
                 style={dynamicStyles.characterGif}
                 contentFit="contain"
-                transition={1000}
+                transition={isAnimationEnabled ? 1000 : 0} // 애니메이션 비활성화 시 전환 효과 제거
               />
             </TouchableOpacity>
           </View>
@@ -292,7 +416,16 @@ export default function ChatScreen() {
         isLoading={isLoading}
         isKeyboardVisible={isKeyboardVisible}
         keyboardHeight={keyboardHeight}
-        onSendMessage={handleSendMessage}
+        onSendMessage={handleSendMessageWithReward} // 코인 보상이 포함된 핸들러 사용
+      />
+
+      {/* 캐릭터 상점 모달 */}
+      <CharacterShopModal
+        visible={showShopModal}
+        onClose={() => setShowShopModal(false)}
+        currentGifIndex={currentGifIndex}
+        onGifChange={handleGifChange}
+        isAnimationEnabled={isAnimationEnabled}
       />
     </View>
   );

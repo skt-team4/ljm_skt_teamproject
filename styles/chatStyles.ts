@@ -119,10 +119,11 @@ export const styles = StyleSheet.create({
   },
   characterContainer: {
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center', // 'flex-start'에서 'center'로 변경
+    paddingHorizontal: 20,
     flex: 1,
     position: 'relative',
-    marginTop : 60,
+    marginTop: 60,
   },
   speechBubbleContainer: {
     alignItems: 'center',
@@ -261,9 +262,9 @@ export const styles = StyleSheet.create({
     color: '#333',
   },
   animationSwitchContainer: {
-  flexDirection: 'column',
-  alignItems: 'center',
-  marginHorizontal: 8,
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginHorizontal: 8,
   },
   switchLabel: {
     fontSize: 10,
@@ -310,6 +311,26 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+
+  // 캐릭터 가이드 관련 (GIF 바로 위로 이동)
+  characterGuideContainer: {
+    alignItems: 'center',
+    marginBottom: -50, // GIF 위에 위치하도록 marginBottom 사용
+    paddingHorizontal: 20,
+  },
+  characterGuideText: {
+    fontSize: 14,
+    color: '#FF8F00',
+    fontWeight: '600',
+    textAlign: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffcc02',
+    overflow: 'hidden',
   },
 });
 
