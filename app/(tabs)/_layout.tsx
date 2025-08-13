@@ -20,29 +20,29 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="search" // -> search.tsx
+        name="nutrition" // -> nutrition.tsx
         options={{
-          title: '검색',
+          title: '영양소 리포트',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
+            <Ionicons name="analytics-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="post" // -> post.tsx
+        name="food_vision" // -> receipt.tsx
         options={{
-          title: '글쓰기',
+          title: '사진',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
+            <Ionicons name="camera-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="notifications" // -> notifications.tsx
+        name="orders" // -> orders.tsx
         options={{
-          title: '알림',
+          title: '주문',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
+            <Ionicons name="bag-outline" size={size} color={color} />
           ),
         }}
       />

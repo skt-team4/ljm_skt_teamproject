@@ -1,60 +1,20 @@
-googleLoginButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#4285F4',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  googleLoginIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  googleLoginButtonText: {
-    color: '#4285F4',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  dividerText: {
-    fontSize: 14,
-    color: '#666',
-    paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
-  },import { useRouter } from 'expo-router';
+import * as AuthSession from 'expo-auth-session';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  SafeAreaView,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import StorageService from '../../utils/storage';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
 
 // WebBrowser 설정 (구글 로그인용)
 WebBrowser.maybeCompleteAuthSession();
@@ -387,6 +347,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  googleLoginButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#4285F4',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  googleLoginIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  googleLoginButtonText: {
+    color: '#4285F4',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    fontSize: 14,
+    color: '#666',
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f9fa',
   },
   demoContainer: {
     backgroundColor: '#fff',
