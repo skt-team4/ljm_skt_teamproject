@@ -1,4 +1,4 @@
-// utils/integratedRiceSystem.ts - 통합 밥풀 & 급식카드 관리 시스템
+// utils/ricePulManager.ts - 통합 밥풀 & 급식카드 관리 시스템
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Storage Keys
@@ -36,7 +36,7 @@ export interface UserProfile {
   name: string;
   ricePul: number;
   level: RicePulLevel;
-  mealCard: MealCardInfo;
+  mealCard: MealCardInfo | null;  // null 허용 - 카드가 등록되지 않을 수 있음
   totalEarnedRicePul: number;
   totalSpentRicePul: number;
   totalMealSpent: number;
@@ -226,6 +226,13 @@ export const getRicePulLevel = async (): Promise<RicePulLevel> => {
 export const chargeMealCard = async (amount: number, method: string = '카드충전'): Promise<boolean> => {
   try {
     const mealCard = await getMealCardInfo();
+    
+    // ✅ 수정: 카드가 등록되지 않은 경우 체크
+    if (!mealCard) {
+      console.log('급식카드가 등록되지 않았습니다!');
+      return false;
+    }
+    
     const newBalance = mealCard.balance + amount;
     
     const updatedCard: MealCardInfo = {
@@ -257,6 +264,13 @@ export const chargeMealCard = async (amount: number, method: string = '카드충
 export const useMealCard = async (amount: number, reason: string = '급식 구매'): Promise<boolean> => {
   try {
     const mealCard = await getMealCardInfo();
+    
+    // ✅ 수정: 카드가 등록되지 않은 경우 체크
+    if (!mealCard) {
+      console.log('급식카드가 등록되지 않았습니다!');
+      return false;
+    }
+    
     const profile = await getUserProfile();
     
     // 레벨별 할인 적용
@@ -310,27 +324,18 @@ export const useMealCard = async (amount: number, reason: string = '급식 구�
 };
 
 // 급식카드 정보 조회
-export const getMealCardInfo = async (): Promise<MealCardInfo> => {
+export const getMealCardInfo = async (): Promise<MealCardInfo | null> => {
   try {
     const cardJson = await AsyncStorage.getItem(MEAL_CARD_BALANCE_KEY);
     if (cardJson) {
       return JSON.parse(cardJson);
     }
     
-    // 기본 카드 정보 생성
-    const defaultCard: MealCardInfo = {
-      balance: 0,
-      cardNumber: `CARD${Date.now().toString().slice(-8)}`
-    };
-    
-    await AsyncStorage.setItem(MEAL_CARD_BALANCE_KEY, JSON.stringify(defaultCard));
-    return defaultCard;
+    // ✅ 수정: 카드가 등록되지 않았으면 null 반환 (새 카드 생성하지 않음)
+    return null;
   } catch (error) {
     console.error('급식카드 조회 실패:', error);
-    return {
-      balance: 0,
-      cardNumber: 'UNKNOWN'
-    };
+    return null;
   }
 };
 
@@ -358,7 +363,7 @@ export const getUserProfile = async (): Promise<UserProfile> => {
       // 프로필에서 누락된 필드들을 최신 데이터로 보완
       profile.ricePul = await getRicePul();
       profile.level = await getRicePulLevel();
-      profile.mealCard = await getMealCardInfo();
+      profile.mealCard = await getMealCardInfo();  // null일 수 있음
       return profile;
     }
     
@@ -367,7 +372,7 @@ export const getUserProfile = async (): Promise<UserProfile> => {
       name: '나비얌 사용자',
       ricePul: await getRicePul(),
       level: await getRicePulLevel(),
-      mealCard: await getMealCardInfo(),
+      mealCard: null,  // ✅ 수정: 초기에는 카드가 없음
       totalEarnedRicePul: 0,
       totalSpentRicePul: 0,
       totalMealSpent: 0,
@@ -389,10 +394,7 @@ export const getUserProfile = async (): Promise<UserProfile> => {
         title: "밥풀 새싹",
         benefits: ["기본 추천 기능"]
       },
-      mealCard: {
-        balance: 0,
-        cardNumber: 'UNKNOWN'
-      },
+      mealCard: null,  // ✅ 수정: 에러 시에도 카드는 없음
       totalEarnedRicePul: 0,
       totalSpentRicePul: 0,
       totalMealSpent: 0,
@@ -521,10 +523,91 @@ export const getStatistics = async () => {
       todayEarned,
       todaySpent,
       totalTransactions: history.length,
-      discountRate: getDiscountRate(profile.level.level)
+      discountRate: getDiscountRate(profile.level.level),
+      hasMealCard: profile.mealCard !== null,  // ✅ 추가: 카드 등록 여부
+      mealCardBalance: profile.mealCard?.balance || 0  // ✅ 추가: 안전한 잔액 조회
     };
   } catch (error) {
     console.error('통계 조회 실패:', error);
     return null;
+  }
+};
+
+// ===================
+// 추가 유틸리티 함수들
+// ===================
+
+// 급식카드에 테스트 잔액 추가 (개발용)
+export const addTestBalance = async (amount: number = 50000): Promise<boolean> => {
+  try {
+    const mealCard = await getMealCardInfo();
+    
+    // ✅ 수정: 카드가 등록되지 않은 경우 먼저 등록
+    if (!mealCard) {
+      console.log('카드가 등록되지 않아 테스트 카드를 등록합니다...');
+      await registerMealCard('1234567890123456', amount);
+      return true;
+    }
+    
+    // 이미 등록된 카드가 있으면 충전
+    const result = await chargeMealCard(amount, '테스트 충전');
+    console.log(`테스트 잔액 ${amount}원 추가 완료!`);
+    return result;
+  } catch (error) {
+    console.error('테스트 잔액 추가 실패:', error);
+    return false;
+  }
+};
+
+// 밥풀 테스트 지급 (개발용)
+export const addTestRicePul = async (amount: number = 1000): Promise<boolean> => {
+  try {
+    const result = await awardRicePul(amount, '테스트 밥풀 지급', 'daily_bonus');
+    console.log(`테스트 밥풀 ${amount}개 지급 완료!`);
+    return result.levelUp;
+  } catch (error) {
+    console.error('테스트 밥풀 지급 실패:', error);
+    return false;
+  }
+};
+
+// 급식카드 등록 및 충전 (UI에서 사용)
+export const registerMealCard = async (cardNumber: string, initialBalance: number = 50000): Promise<MealCardInfo> => {
+  try {
+    const newMealCardInfo: MealCardInfo = {
+      balance: initialBalance,
+      cardNumber: cardNumber.slice(0, 8) + '****',
+      lastUsed: undefined
+    };
+    
+    await AsyncStorage.setItem(MEAL_CARD_BALANCE_KEY, JSON.stringify(newMealCardInfo));
+    
+    // 거래 기록 추가
+    await addTransaction({
+      id: Date.now().toString(),
+      amount: initialBalance,
+      reason: '급식카드 등록 및 초기 충전',
+      timestamp: Date.now(),
+      type: 'charge_card',
+      category: 'card_charge'
+    });
+    
+    console.log(`급식카드 등록 완료! 초기 잔액: ${initialBalance}원`);
+    return newMealCardInfo;
+  } catch (error) {
+    console.error('급식카드 등록 실패:', error);
+    throw error;
+  }
+};
+
+// 급식카드 삭제
+export const deleteMealCard = async (): Promise<boolean> => {
+  try {
+    await AsyncStorage.removeItem(MEAL_CARD_BALANCE_KEY);
+    console.log('급식카드 삭제 완료!');
+    return true;
+  } catch (error) {
+    console.error('급식카드 삭제 실패:', error);
+    return false;
   }
 };

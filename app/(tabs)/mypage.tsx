@@ -14,8 +14,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  addTestBalance,
+  deleteMealCard,
   getTransactionHistory,
   getUserProfile,
+  registerMealCard, // 테스트용
   type MealCardInfo,
   type RicePulLevel,
   type Transaction
@@ -100,7 +103,7 @@ export default function MyPageScreen() {
     }, [])
   );
 
-  // 통합 데이터 로드 함수
+  // ✅ 수정된 통합 데이터 로드 함수
   const loadIntegratedData = async () => {
     try {
       console.log('📦 MyPage - 통합 데이터 로드 시작');
@@ -113,7 +116,10 @@ export default function MyPageScreen() {
       
       setCurrentRicePul(userProfile.ricePul);
       setCurrentLevel(userProfile.level);
+      
+      // ✅ 수정: 단순히 mealCard가 null인지만 체크
       setMealCardInfo(userProfile.mealCard);
+      
       setTransactionHistory(transactions);
       
       // 기존 프로필 업데이트
@@ -128,30 +134,7 @@ export default function MyPageScreen() {
     }
   };
 
-  // 급식카드 충전 처리
-  const handleChargeCard = async () => {
-    const amount = parseInt(chargeAmount);
-    if (!amount || amount <= 0) {
-      Alert.alert('알림', '올바른 금액을 입력해주세요.');
-      return;
-    }
-
-    try {
-      const success = await chargeMealCard(amount, '앱 내 충전');
-      if (success) {
-        Alert.alert('충전 완료', `${amount.toLocaleString()}원이 충전되었습니다.`);
-        setChargeAmount('');
-        setShowMealCardModal(false);
-        await loadIntegratedData(); // 데이터 새로고침
-      } else {
-        Alert.alert('오류', '충전에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('급식카드 충전 실패:', error);
-      Alert.alert('오류', '충전 중 오류가 발생했습니다.');
-    }
-  };
-
+  // 프로필 관련 함수들
   const handleProfileEdit = () => {
     setTempProfile(profile);
     setIsEditingProfile(true);
@@ -167,14 +150,30 @@ export default function MyPageScreen() {
     setIsEditingProfile(false);
   };
 
+  // 급식카드 관련 함수들
   const handleCardEdit = () => {
     setTempCard(profile.card);
     setIsEditingCard(true);
   };
 
-  const handleCardSave = () => {
-    setProfile({ ...profile, card: tempCard });
-    setIsEditingCard(false);
+  // ✅ 수정된 급식카드 등록 함수
+  const handleCardSave = async () => {
+    try {
+      // ✅ 실제 registerMealCard 함수 사용
+      const newMealCardInfo = await registerMealCard(tempCard.number, 50000);
+      
+      setProfile({ ...profile, card: tempCard });
+      setMealCardInfo(newMealCardInfo);
+      setIsEditingCard(false);
+      
+      Alert.alert('등록 완료', '급식카드가 성공적으로 등록되었습니다!');
+      
+      // 데이터 새로고침
+      await loadIntegratedData();
+    } catch (error) {
+      console.error('급식카드 등록 실패:', error);
+      Alert.alert('등록 실패', '급식카드 등록 중 오류가 발생했습니다.');
+    }
   };
 
   const handleCardCancel = () => {
@@ -182,6 +181,58 @@ export default function MyPageScreen() {
     setIsEditingCard(false);
   };
 
+  // ✅ 수정된 급식카드 삭제 함수
+  const handleCardDelete = () => {
+    Alert.alert(
+      '급식카드 삭제',
+      '등록된 급식카드를 삭제하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // ✅ 실제 deleteMealCard 함수 사용
+              await deleteMealCard();
+              
+              setMealCardInfo(null);
+              setProfile(prev => ({
+                ...prev,
+                card: {
+                  number: '',
+                  expiryDate: '',
+                  holderName: '',
+                  region: '',
+                }
+              }));
+              
+              Alert.alert('삭제 완료', '급식카드가 삭제되었습니다.');
+              
+              // 데이터 새로고침
+              await loadIntegratedData();
+            } catch (error) {
+              console.error('급식카드 삭제 실패:', error);
+              Alert.alert('삭제 실패', '급식카드 삭제 중 오류가 발생했습니다.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // ✅ 테스트용 충전 함수 (개발 중에만 사용)
+  const handleTestCharge = async () => {
+    try {
+      await addTestBalance(30000);
+      await loadIntegratedData();
+      Alert.alert('테스트 충전 완료', '30,000원이 충전되었습니다!');
+    } catch (error) {
+      console.error('테스트 충전 실패:', error);
+    }
+  };
+
+  // 카드 입력 포맷팅 함수들
   const formatCardNumberInput = (value: string) => {
     const numbers = value.replace(/\D/g, '');
     return numbers.replace(/(\d{4})(?=\d)/g, '$1-');
@@ -216,6 +267,7 @@ export default function MyPageScreen() {
     return formatExpiryDateInput(numbers);
   };
 
+  // 지역 목록
   const regions = [
     '서울특별시',
     '부산광역시',
@@ -236,6 +288,7 @@ export default function MyPageScreen() {
     '제주특별자치도',
   ];
 
+  // 주소 관련 함수들
   const handleAddAddress = () => {
     if (newAddress.address) {
       const id = Math.max(...addresses.map((a) => a.id), 0) + 1;
@@ -277,6 +330,15 @@ export default function MyPageScreen() {
           <View>
             <Text style={styles.appTitle}>마이페이지</Text>
           </View>
+          {/* ✅ 테스트용 충전 버튼 (개발 중에만 표시) */}
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={handleTestCharge}
+            >
+              <Text style={styles.testButtonText}>테스트 충전</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 프로필 배너 */}
@@ -375,11 +437,11 @@ export default function MyPageScreen() {
         {/* 급식카드 등록 섹션 */}
         <View style={styles.contentSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>급식카드 등록</Text>
+            <Text style={styles.sectionTitle}>급식카드</Text>
             {!isEditingCard && (
               <TouchableOpacity onPress={handleCardEdit}>
                 <Text style={styles.seeAllText}>
-                  {profile.card.number ? '수정' : '등록'}
+                  {mealCardInfo ? '수정' : '등록'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -387,50 +449,140 @@ export default function MyPageScreen() {
           <Text style={styles.sectionSubtitle}>급식카드를 등록하여 편리하게 결제하세요</Text>
 
           <View style={styles.cardInfoCard}>
-            {mealCardInfo ? (
-              <View style={styles.mealCardContainer}>
-                <View style={styles.mealCardHeader}>
-                  <Text style={styles.mealCardTitle}>💳 나의 급식카드</Text>
-                  <View style={styles.registeredBadge}>
-                    <Text style={styles.registeredBadgeText}>등록완료</Text>
+            {!isEditingCard ? (
+              <View>
+                {mealCardInfo ? (
+                  <View style={styles.mealCardContainer}>
+                    <View style={styles.mealCardHeader}>
+                      <Text style={styles.mealCardTitle}>💳 급식카드</Text>
+                      <View style={styles.registeredBadge}>
+                        <Text style={styles.registeredBadgeText}>등록완료</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.mealCardBalance}>
+                      <Text style={styles.balanceLabel}>현재 잔액</Text>
+                      <Text style={styles.balanceAmount}>
+                        {mealCardInfo.balance.toLocaleString()}원
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.mealCardInfo}>
+                      <Text style={styles.cardNumberText}>
+                        카드번호: {mealCardInfo.cardNumber}
+                      </Text>
+                      {mealCardInfo.lastUsed && (
+                        <Text style={styles.lastUsedText}>
+                          최근 사용: {new Date(mealCardInfo.lastUsed).toLocaleDateString()}
+                        </Text>
+                      )}
+                    </View>
+                    
+                    {/* 레벨별 할인 혜택 표시 */}
+                    {currentLevel && currentLevel.level >= 5 && (
+                      <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>
+                          🎉 레벨 {currentLevel.level} 혜택: {
+                            currentLevel.level >= 7 ? '15%' :
+                            currentLevel.level >= 6 ? '10%' : '5%'
+                          } 할인!
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* 카드 삭제 버튼 */}
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity
+                        style={styles.deleteCardButton}
+                        onPress={handleCardDelete}
+                      >
+                        <Text style={styles.deleteCardButtonText}>카드 삭제</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-                
-                <View style={styles.mealCardBalance}>
-                  <Text style={styles.balanceLabel}>잔액</Text>
-                  <Text style={styles.balanceAmount}>
-                    {mealCardInfo.balance.toLocaleString()}원
-                  </Text>
-                </View>
-                
-                <View style={styles.mealCardInfo}>
-                  <Text style={styles.cardNumberText}>
-                    카드번호: {mealCardInfo.cardNumber}
-                  </Text>
-                  {mealCardInfo.lastUsed && (
-                    <Text style={styles.lastUsedText}>
-                      최근 사용: {new Date(mealCardInfo.lastUsed).toLocaleDateString()}
-                    </Text>
-                  )}
-                </View>
-                
-                {/* 레벨별 할인 혜택 표시 */}
-                {currentLevel && currentLevel.level >= 5 && (
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>
-                      🎉 레벨 {currentLevel.level} 혜택: {
-                        currentLevel.level >= 7 ? '15%' :
-                        currentLevel.level >= 6 ? '10%' : '5%'
-                      } 할인!
-                    </Text>
+                ) : (
+                  <View style={styles.noCardContainer}>
+                    <Text style={styles.noCardText}>급식카드를 등록해주세요</Text>
                   </View>
                 )}
               </View>
             ) : (
-              <View style={styles.noCardContainer}>
-                <Text style={styles.noCardEmoji}>💳</Text>
-                <Text style={styles.noCardText}>급식카드를 등록해주세요</Text>
-                <Text style={styles.noCardDescText}>급식카드를 등록하여 편리하게 결제하세요</Text>
+              <View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>카드번호</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="예: 1234-5678-9012-3456"
+                    value={formatCardNumberInput(tempCard.number)}
+                    onChangeText={(text) => {
+                      const numbers = text.replace(/\D/g, '');
+                      if (numbers.length <= 16) {
+                        setTempCard({ ...tempCard, number: numbers });
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={19}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>유효기간</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="MM/YY"
+                    value={formatExpiryDateInput(tempCard.expiryDate)}
+                    onChangeText={(text) => {
+                      const numbers = text.replace(/\D/g, '');
+                      if (numbers.length <= 4) {
+                        setTempCard({ ...tempCard, expiryDate: numbers });
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={5}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>카드 소유자 이름</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="예: 김철수"
+                    value={tempCard.holderName}
+                    onChangeText={(text) => setTempCard({ ...tempCard, holderName: text })}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>지역 선택</Text>
+                  <View style={styles.regionGrid}>
+                    {regions.map((region) => (
+                      <TouchableOpacity
+                        key={region}
+                        style={[
+                          styles.regionButton,
+                          tempCard.region === region && styles.regionButtonSelected
+                        ]}
+                        onPress={() => setTempCard({ ...tempCard, region })}
+                      >
+                        <Text style={[
+                          styles.regionButtonText,
+                          tempCard.region === region && styles.regionButtonTextSelected
+                        ]}>
+                          {region}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity style={styles.saveButton} onPress={handleCardSave}>
+                    <Text style={styles.saveButtonText}>등록</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.cancelButton} onPress={handleCardCancel}>
+                    <Text style={styles.cancelButtonText}>취소</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
@@ -733,6 +885,18 @@ const styles = StyleSheet.create({
     color: '#FFBF00',
     letterSpacing: 0.5,
   },
+  // ✅ 테스트 버튼 스타일 추가
+  testButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   profileBanner: {
     marginHorizontal: 20,
     marginTop: 10,
@@ -896,6 +1060,27 @@ const styles = StyleSheet.create({
   discountText: {
     fontSize: 12,
     color: '#856404',
+    fontWeight: '600',
+  },
+  // 카드 액션 관련 스타일
+  cardActions: {
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  deleteCardButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#F44336',
+    borderRadius: 8,
+  },
+  deleteCardButtonText: {
+    fontSize: 12,
+    color: '#F44336',
     fontWeight: '600',
   },
   // 밥풀 상세 카드 스타일
@@ -1264,23 +1449,13 @@ const styles = StyleSheet.create({
   },
   noCardContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
-  },
-  noCardEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
+    paddingVertical: 30,
   },
   noCardText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  noCardDescText: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '500',
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
   },
   addAddressCard: {
     borderRadius: 20,
