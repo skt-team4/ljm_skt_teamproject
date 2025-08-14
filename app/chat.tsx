@@ -1,4 +1,4 @@
-// chat.tsx - 캐릭터 상점 연동 버전
+// chat.tsx - 캐릭터 상점 연동 버전 (밥풀 시스템 적용)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
@@ -20,6 +20,7 @@ import { ChatInput } from '../components/ChatInput';
 import { SpeechBubble } from '../components/SpeechBubble';
 import useChatLogic from '../hooks/useChatLogic'; // 기본 import로 변경
 import { isSmallScreen, SCREEN_HEIGHT, styles } from '../styles/chatStyles';
+import { awardRicePul } from '../utils/ricePulManager'; // 밥풀 매니저 import
 
 // GIF 애니메이션 배열
 const gifAnimations = [
@@ -73,7 +74,7 @@ export default function ChatScreen() {
     new Animated.Value(0),
   ]);
 
-  // 커스텀 훅에서 로직 가져오기 (handleGifClick 제외)
+  // 커스텀 훅에서 로직 가져오기 (handleGifClick, awardCoins 제외)
   const {
     inputText,
     setInputText,
@@ -89,8 +90,7 @@ export default function ChatScreen() {
     handleBackToMenu,
     handleRetry,
     handleGifChange, // 상점용 GIF 변경 핸들러 (훅에서 가져옴)
-    awardCoins, // 코인 보상 함수 (훅에서 가져옴)
-    // handleGifClick은 여기서 덮어쓸 예정이므로 가져오지 않음
+    // handleGifClick과 awardCoins는 여기서 덮어쓸 예정이므로 가져오지 않음
   } = useChatLogic(); // 기본 import 사용
 
   // 화면이 포커스될 때마다 애니메이션 설정 다시 로드
@@ -154,10 +154,11 @@ export default function ChatScreen() {
     console.log(`[Chat] 현재 표시될 GIF:`, gifAnimations[currentGifIndex]);
   }, [currentGifIndex]);
 
-  // 메시지 전송시 코인 보상
-  const handleSendMessageWithReward = (message: string) => {
+  // 메시지 전송시 밥풀 보상
+  const handleSendMessageWithReward = async (message: string) => {
     handleSendMessage(message);
-    awardCoins(10, '음식 추천 요청');
+    // 밥풀 10개 지급
+    await awardRicePul(10, '음식 추천 요청');
   };
 
   // 점 애니메이션 생성 함수
@@ -396,7 +397,7 @@ export default function ChatScreen() {
             {/* 캐릭터 클릭 안내 텍스트 - GIF 바로 위 */}
             <View style={styles.characterGuideContainer}>
               <Text style={styles.characterGuideText}>
-                ✨ 캐릭터를 클릭해서 꾸며보세요!
+               캐릭터를 클릭해서 꾸며보세요!
               </Text>
             </View>
 
@@ -423,7 +424,7 @@ export default function ChatScreen() {
         isLoading={isLoading}
         isKeyboardVisible={isKeyboardVisible}
         keyboardHeight={keyboardHeight}
-        onSendMessage={handleSendMessageWithReward} // 코인 보상이 포함된 핸들러 사용
+        onSendMessage={handleSendMessageWithReward} // 밥풀 보상이 포함된 핸들러 사용
       />
 
       {/* 캐릭터 상점 모달 */}

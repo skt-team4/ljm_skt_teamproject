@@ -106,7 +106,7 @@ export default function RootLayout() {
   console.log('Current segments:', segments, 'IsLoggedIn:', isLoggedIn, 'IsLoading:', isLoading);
   
   // 기존 플로팅 버튼 로직 유지
-  const hideFloatingButtonScreens = ['chat', 'nutrition', 'settings'];
+  const hideFloatingButtonScreens = ['chat', 'food_vision'];
   const currentScreen = segments[segments.length - 1];
   const shouldHideFloatingButton = hideFloatingButtonScreens.includes(currentScreen);
   

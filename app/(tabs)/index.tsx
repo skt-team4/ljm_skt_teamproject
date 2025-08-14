@@ -13,7 +13,7 @@ export default function HomeScreen() {
         {/* 깔끔한 헤더 */}
         <View style={styles.appHeader}>
           <View>
-            <Text style={styles.appTitle}>YUM:AI</Text>
+            <Text style={styles.appTitle}>밥풀레이스</Text>
             <Text style={styles.appSubtitle}>오늘도 맛있는 하루 되세요!</Text>
           </View>
         </View>
@@ -42,9 +42,6 @@ export default function HomeScreen() {
         <View style={styles.contentSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>진행중인 캠페인</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>전체보기</Text>
-            </TouchableOpacity>
           </View>
           <Text style={styles.sectionSubtitle}>캠페인 참여하고 따뜻한 혜택 받아가세요</Text>
           
@@ -68,9 +65,6 @@ export default function HomeScreen() {
                 <Text style={styles.campaignDetailText}>• 혜택: 도시락 구매 시 10% 할인</Text>
                 <Text style={styles.campaignDetailText}>• 대상: 급식카드 소지자 누구나</Text>
               </View>
-              <TouchableOpacity style={styles.campaignButton}>
-                <Text style={styles.campaignButtonText}>참여하기</Text>
-              </TouchableOpacity>
             </View>
             <View style={styles.campaignImageContainer}>
               <View style={styles.campaignImage}>

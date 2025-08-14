@@ -2,12 +2,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-    Dimensions,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import StorageService from '../../utils/storage';
 
@@ -39,7 +39,7 @@ export default function WelcomeScreen() {
         <View style={styles.topSection}>
           {/* 로고/타이틀 영역 */}
           <View style={styles.titleContainer}>
-            <Text style={styles.appTitle}>YUM:AI</Text>
+            <Text style={styles.appTitle}>밥풀레이스</Text>
             <Text style={styles.appSubtitle}>맛있는 식사의 시작</Text>
             <Text style={styles.welcomeEmoji}>🍽️</Text>
           </View>

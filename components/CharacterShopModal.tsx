@@ -1,4 +1,4 @@
-// CharacterShopModal.tsx
+// CharacterShopModal.tsx - 밥풀 시스템 적용
 import { Image } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import {
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { getRicePul, spendRicePul } from '../utils/ricePulManager';
 import StorageService from '../utils/storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -96,7 +97,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
   onGifChange,
   isAnimationEnabled,
 }) => {
-  const [coins, setCoins] = useState(1000); 
+  const [ricePul, setRicePul] = useState(1000); 
   const [ownedItems, setOwnedItems] = useState<string[]>(['hi', 'sunglass']); // StorageService 기본값과 동일
   const [selectedCategory, setSelectedCategory] = useState<'emotion' | 'action' | 'special'>('emotion');
   const [isLoading, setIsLoading] = useState(false);
@@ -108,18 +109,23 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
     }
   }, [visible]);
 
-  // StorageService를 사용한 사용자 데이터 로드
+  // 사용자 데이터 로드 (밥풀 + 아이템)
   const loadUserData = async () => {
     try {
       setIsLoading(true);
+      
+      // 밥풀 데이터 로드
+      const currentRicePul = await getRicePul();
+      
+      // 아이템 데이터 로드 (기존 StorageService 사용)
       const userData = await StorageService.getUserData();
       
       console.log('📦 CharacterShop - 데이터 로드:', {
-        coins: userData.coins,
+        ricePul: currentRicePul,
         items: userData.ownedItems
       });
       
-      setCoins(userData.coins);
+      setRicePul(currentRicePul);
       setOwnedItems(userData.ownedItems);
     } catch (error) {
       console.error('❌ 사용자 데이터 로드 실패:', error);
@@ -136,7 +142,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
       id: item.id,
       price: item.price,
       itemIndex,
-      currentCoins: coins,
+      currentRicePul: ricePul,
       alreadyOwned: ownedItems.includes(item.id)
     });
     
@@ -160,16 +166,16 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
       return;
     }
 
-    // 코인 부족 체크
-    if (coins < item.price) {
-      Alert.alert('코인 부족', '코인이 부족합니다. 게임을 플레이해서 코인을 모아보세요!');
+    // 밥풀 부족 체크
+    if (ricePul < item.price) {
+      Alert.alert('밥풀 부족', '밥풀이 부족합니다. 게임을 플레이해서 밥풀을 모아보세요!');
       return;
     }
 
     // 구매 확인 팝업
     Alert.alert(
       '아이템 구매',
-      `${item.name}을(를) ${item.price} 코인으로 구매하시겠습니까?`,
+      `${item.name}을(를) ${item.price} 밥풀로 구매하시겠습니까?`,
       [
         { text: '취소', style: 'cancel' },
         {
@@ -186,18 +192,25 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
       setIsLoading(true);
       console.log('💳 구매 실행 중...', item.name);
 
-      const result = await StorageService.purchaseItem(item.id, item.price);
+      // 밥풀 사용
+      const success = await spendRicePul(item.price, `캐릭터 아이템 구매: ${item.name}`);
       
-      if (result.success) {
+      if (success) {
+        // 아이템 보유 목록에 추가
+        const newItems = await StorageService.addOwnedItem(item.id);
+        
+        // 최신 밥풀 수량 조회
+        const newRicePul = await getRicePul();
+        
         console.log('✅ 구매 성공:', {
           item: item.name,
-          newCoins: result.coins,
-          newItems: result.items
+          newRicePul: newRicePul,
+          newItems: newItems
         });
 
         // UI 상태 업데이트
-        setCoins(result.coins);
-        setOwnedItems(result.items);
+        setRicePul(newRicePul);
+        setOwnedItems(newItems);
         
         // 구매한 아이템 바로 적용
         onGifChange(itemIndex);
@@ -205,7 +218,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
         // 성공 메시지
         Alert.alert('구매 완료', `${item.name}을(를) 구매했습니다! 🎉`);
       } else {
-        console.log('❌ 구매 실패:', { coins: result.coins, price: item.price });
+        console.log('❌ 구매 실패: 밥풀 부족');
         Alert.alert('구매 실패', '구매 중 문제가 발생했습니다.');
       }
     } catch (error) {
@@ -306,7 +319,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
               <Text style={styles.freeText}>무료</Text>
             ) : (
               <View style={styles.priceRow}>
-                <Text style={styles.coinIcon}>🪙</Text>
+                <View style={styles.riceIcon} />
                 <Text style={styles.itemPrice}>{item.price.toLocaleString()}</Text>
               </View>
             )}
@@ -341,10 +354,10 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
             </Text>
           </View>
           
-          {/* 코인 표시 */}
-          <View style={styles.coinContainer}>
-            <Text style={styles.coinIcon}>🪙</Text>
-            <Text style={styles.coinAmount}>{coins.toLocaleString()}</Text>
+          {/* 밥풀 표시 */}
+          <View style={styles.ricePulContainer}>
+            <View style={styles.riceIcon} />
+            <Text style={styles.ricePulAmount}>{ricePul.toLocaleString()}</Text>
           </View>
         </View>
 
@@ -366,14 +379,14 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
             {getFilteredItems().map((item, index) => renderItemCard(item, index))}
           </View>
           
-          {/* 코인 획득 안내 */}
-          <View style={styles.coinGuideContainer}>
-            <Text style={styles.coinGuideTitle}>💡 코인 획득 방법</Text>
-            <Text style={styles.coinGuideText}>
-              • 매일 로그인: 50 코인{'\n'}
-              • 음식 추천 받기: 10 코인{'\n'}
-              • 친구와 대화하기: 5 코인{'\n'}
-              • 첫 로그인 보너스: 500 코인
+          {/* 밥풀 획득 안내 */}
+          <View style={styles.ricePulGuideContainer}>
+            <Text style={styles.ricePulGuideTitle}>💡 밥풀 획득 방법</Text>
+            <Text style={styles.ricePulGuideText}>
+              • 매일 로그인: 50 밥풀{'\n'}
+              • 음식 추천 받기: 10 밥풀{'\n'}
+              • 친구와 대화하기: 5 밥풀{'\n'}
+              • 첫 로그인 보너스: 500 밥풀
             </Text>
           </View>
         </ScrollView>
@@ -434,24 +447,28 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
-  coinContainer: {
+  ricePulContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
+    backgroundColor: '#e8f5e8',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ffeaa7',
+    borderColor: '#a8e6a8',
   },
-  coinIcon: {
-    fontSize: 16,
-    marginRight: 4,
+  riceIcon: {
+    width: 12,
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 6,
+    marginRight: 6,
+    transform: [{ rotate: '15deg' }],
   },
-  coinAmount: {
+  ricePulAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#b8860b',
+    color: '#2d5a2d',
   },
   categoryContainer: {
     flexDirection: 'row',
@@ -601,7 +618,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#b8860b',
+    color: '#2d5a2d',
   },
   ownedText: {
     fontSize: 14,
@@ -613,7 +630,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#17a2b8',
   },
-  coinGuideContainer: {
+  ricePulGuideContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
@@ -621,13 +638,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
-  coinGuideTitle: {
+  ricePulGuideTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
-  coinGuideText: {
+  ricePulGuideText: {
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
