@@ -181,7 +181,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
 
     // 밥풀 부족 체크
     if (ricePul < item.price) {
-      Alert.alert('밥풀 부족', '밥풀이 부족합니다. 게임을 플레이해서 밥풀을 모아보세요!');
+      Alert.alert('밥풀 부족', '밥풀이 부족합니다. 밥풀을 모아보세요!');
       return;
     }
 
@@ -363,7 +363,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
           <View style={styles.titleContainer}>
             <Text style={styles.title}>캐릭터 상점</Text>
             <Text style={styles.subtitle}>
-              {isLoading ? '로딩 중...' : '그릇이를 꾸며보세요!'}
+              {isLoading ? '로딩 중...' : '르시를 꾸며보세요!'}
             </Text>
           </View>
           
@@ -396,10 +396,10 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
           <View style={styles.ricePulGuideContainer}>
             <Text style={styles.ricePulGuideTitle}>💡 밥풀 획득 방법</Text>
             <Text style={styles.ricePulGuideText}>
-              • 매일 로그인: 50 밥풀{'\n'}
-              • 음식 추천 받기: 10 밥풀{'\n'}
-              • 친구와 대화하기: 5 밥풀{'\n'}
-              • 첫 로그인 보너스: 500 밥풀
+              • 매일 로그인: 10 밥풀{'\n'}
+              • 메뉴 추천 받기: 5 밥풀{'\n'}
+              • 추천 받은 식당 찾아가기: 5 밥풀{'\n'}
+              • 리뷰 작성: 50 밥풀
             </Text>
           </View>
         </ScrollView>

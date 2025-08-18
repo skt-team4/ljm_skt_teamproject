@@ -17,13 +17,7 @@ export default function RootLayout() {
 
   const checkAuthState = async () => {
     try {
-      // 🚨 임시: 개발 테스트를 위한 강제 초기화 (테스트 완료 후 제거하세요!)
-      // await StorageService.clearAllData();
-      // console.log('🧹 강제 초기화 완료');
-      
       const { token } = await StorageService.getAuthData();
-      
-      console.log('Auth check - Token:', token);
       
       if (token) {
         setIsLoggedIn(true);
@@ -37,41 +31,25 @@ export default function RootLayout() {
 
   // 로그인 상태 변경에 따른 네비게이션 처리
   useEffect(() => {
-    if (isLoading) return; // 로딩 중일 때는 아무것도 하지 않음
+    if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inTabsGroup = segments[0] === '(tabs)';
     const isModalScreen = ['chat', 'nutrition', 'settings'].includes(segments[0]);
 
-    console.log('🧭 Navigation check:', {
-      isLoggedIn,
-      inAuthGroup,
-      inTabsGroup,
-      isModalScreen,
-      segments: segments.join('/')
-    });
-
     if (!isLoggedIn && !inAuthGroup && !isModalScreen) {
-      // 로그인 안 됨 + 인증 화면이 아님 + 모달이 아님 → 환영 화면으로
-      console.log('➡️ Redirecting to welcome');
       router.replace('/(auth)/welcome');
     } else if (isLoggedIn && inAuthGroup) {
-      // 로그인 됨 + 인증 화면에 있음 → 홈으로
-      console.log('➡️ Redirecting to home');
       router.replace('/(tabs)');
     }
-  }, [isLoggedIn, isLoading]); // segments 의존성 제거로 무한 루프 방지
+  }, [isLoggedIn, isLoading]);
 
   // 로그인 성공 핸들러
   const handleLoginSuccess = async (userToken: string, userId: string) => {
     try {
-      console.log('🎉 Login success, saving auth data...');
       await StorageService.setAuthData(userToken, userId);
       await StorageService.initializeUserData();
-      
-      console.log('✅ Auth data saved, updating state...');
-      setIsLoggedIn(true); // 상태 업데이트가 useEffect를 트리거하여 리다이렉션
-      
+      setIsLoggedIn(true);
     } catch (error) {
       console.error('Login success handling failed:', error);
     }
@@ -88,35 +66,18 @@ export default function RootLayout() {
     }
   };
 
-  // 개발용: 모든 데이터 초기화
-  const handleClearAll = async () => {
-    try {
-      await StorageService.clearAllData();
-      setIsLoggedIn(false);
-      router.replace('/(auth)/welcome');
-      console.log('모든 데이터 초기화 완료');
-    } catch (error) {
-      console.error('Clear all failed:', error);
-    }
-  };
-
-  // 초기 유저 데이터 설정 (CharacterShopModal과 연동) - 이제 StorageService에서 처리
-
-  // 디버깅용 로그 (기존 코드 유지)
-  console.log('Current segments:', segments, 'IsLoggedIn:', isLoggedIn, 'IsLoading:', isLoading);
-  
-  // 기존 플로팅 버튼 로직 유지
-  const hideFloatingButtonScreens = ['chat', 'food_vision'];
+  // 플로팅 버튼 표시 로직
+  const hideFloatingButtonScreens = ['chat', 'food_vision', 'nutrition'];
   const currentScreen = segments[segments.length - 1];
   const shouldHideFloatingButton = hideFloatingButtonScreens.includes(currentScreen);
   
   const isTabScreen = segments.length > 0 && segments[0] === '(tabs)';
   const isInitialLoad = segments.length === 0;
   
-  // 플로팅 버튼은 로그인된 상태에서만 표시
-  const shouldShowFloatingButton = (isInitialLoad || isTabScreen) && 
+  const shouldShowFloatingButton = !isLoading && 
+                                   isLoggedIn && 
                                    !shouldHideFloatingButton && 
-                                   isLoggedIn;
+                                   (isInitialLoad || isTabScreen || segments[0] === '(tabs)');
 
   // 로딩 화면
   if (isLoading) {
@@ -133,13 +94,11 @@ export default function RootLayout() {
       <StatusBar style="dark" />
 
       <Stack>
-        {/* 인증 화면들 추가 */}
         <Stack.Screen 
           name="(auth)" 
           options={{ headerShown: false }}
         />
         
-        {/* 기존 화면들 유지 */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen 
           name="chat" 
@@ -169,7 +128,6 @@ export default function RootLayout() {
         />
       </Stack>
       
-      {/* 기존 플로팅 버튼 코드 유지 (로그인된 상태에서만) */}
       {shouldShowFloatingButton && (
         <View style={styles.floatingContainer}>
           <View style={styles.speechBubble}>
@@ -194,7 +152,6 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  // 로딩 화면 스타일 추가
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -208,7 +165,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   
-  // 기존 스타일들 유지
   floatingContainer: {
     position: 'absolute',
     bottom: 120,

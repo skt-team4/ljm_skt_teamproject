@@ -758,7 +758,7 @@ export default function MyPageScreen() {
               style={styles.settingItem}
               onPress={() => router.push('/settings')}
             >
-              <Text style={styles.settingText}>⚙️ 앱 설정</Text>
+              <Text style={styles.settingText}>⚙️ 챗봇 설정</Text>
               <Text style={styles.settingArrow}>→</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.settingItem}>

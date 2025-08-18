@@ -158,7 +158,6 @@ const RecommendedFoodScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>추천받은 음식</Text>
-        <Text style={styles.headerSubtitle}>👍 따봉한 음식들</Text>
       </View>
 
       <FlatList

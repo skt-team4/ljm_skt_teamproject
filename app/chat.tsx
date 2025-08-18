@@ -1,4 +1,4 @@
-// chat.tsx - 캐릭터 상점 연동 버전 (밥풀 시스템 적용)
+// chat.tsx - 캐릭터 상점 연동 버전 (밥풀 시스템 적용) + 타이핑 효과
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
@@ -21,6 +21,50 @@ import { SpeechBubble } from '../components/SpeechBubble';
 import useChatLogic from '../hooks/useChatLogic'; // 기본 import로 변경
 import { isSmallScreen, SCREEN_HEIGHT, styles } from '../styles/chatStyles';
 import { awardRicePul } from '../utils/ricePulManager'; // 밥풀 매니저 import
+
+// 타이핑 효과 컴포넌트
+const TypingText = ({ 
+  text, 
+  speed = 100, 
+  style, 
+  onComplete 
+}: { 
+  text: string; 
+  speed?: number; 
+  style?: any; 
+  onComplete?: () => void;
+}) => {
+  const [displayText, setDisplayText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timer = setTimeout(() => {
+        setDisplayText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, speed);
+
+      return () => clearTimeout(timer);
+    } else if (currentIndex === text.length && onComplete) {
+      onComplete();
+    }
+  }, [currentIndex, text, speed, onComplete]);
+
+  // 텍스트가 변경되면 초기화
+  useEffect(() => {
+    setDisplayText('');
+    setCurrentIndex(0);
+  }, [text]);
+
+  return (
+    <Text style={[style, { textAlign: 'left' }]}>
+      {displayText}
+      {currentIndex < text.length && (
+        <Text style={{ opacity: 0.5 }}>|</Text> // 커서 효과
+      )}
+    </Text>
+  );
+};
 
 // GIF 애니메이션 배열
 const gifAnimations = [
@@ -53,6 +97,7 @@ export default function ChatScreen() {
   // 로딩 애니메이션 상태
   const [showLoading, setShowLoading] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
+  const [showTyping, setShowTyping] = useState(false); // 타이핑 효과 제어
   
   // 애니메이션 설정 상태
   const [isAnimationEnabled, setIsAnimationEnabled] = useState(true);
@@ -73,6 +118,9 @@ export default function ChatScreen() {
     new Animated.Value(0),
     new Animated.Value(0),
   ]);
+
+  // 환영 메시지 텍스트
+  const welcomeMessage = "날씨가 더우니까 시원한 거 먹으면 좋을거 같아! 먹고 싶은 거 있으면 말해줘!";
 
   // 커스텀 훅에서 로직 가져오기 (handleGifClick, awardCoins 제외)
   const {
@@ -215,6 +263,7 @@ export default function ChatScreen() {
         animations.forEach(anim => anim.stop());
         setShowLoading(false);
         setShowMessage(true);
+        setShowTyping(true); // 타이핑 효과 시작
       }, 1500);
 
       return () => {
@@ -226,6 +275,7 @@ export default function ChatScreen() {
       const timer = setTimeout(() => {
         setShowLoading(false);
         setShowMessage(true);
+        setShowTyping(true);
       }, 300); // 짧은 딜레이만 적용
 
       return () => clearTimeout(timer);
@@ -251,9 +301,8 @@ export default function ChatScreen() {
   }, [isLoading, showResponse, apiLoadingAnimValues, isAnimationEnabled]);
 
   // 점 애니메이션 컴포넌트 (초기 로딩용)
-  const LoadingDots = ({ animationValues, loadingText }: { 
+  const LoadingDots = ({ animationValues}: { 
     animationValues: Animated.Value[], 
-    loadingText: string 
   }) => (
     <View style={{ alignItems: 'center' }}>
       {/* 애니메이션이 활성화된 경우에만 점 애니메이션 표시 */}
@@ -305,7 +354,6 @@ export default function ChatScreen() {
         dynamicStyles.welcomeText,
         { fontSize: 14, color: '#999', textAlign: 'center' }
       ]}>
-        {loadingText}
       </Text>
     </View>
   );
@@ -365,35 +413,39 @@ export default function ChatScreen() {
               marginTop: isSmallScreen ? 15 : 30,
               marginBottom: isSmallScreen ? 15 : 30,
               minHeight: isSmallScreen ? 80 : 100,
+              paddingHorizontal: 20, // 좌우 패딩 추가
             }
           ]}>
             {!showResponse && (
               <>
-                <Text style={dynamicStyles.welcomeText}>안녕하세요!!</Text>
-                
                 {/* 초기 로딩만 여기서 표시, API 로딩은 말풍선으로 이동 */}
                 <View style={{ 
-                  alignItems: 'center', 
+                  alignItems: 'flex-start', // 좌측 정렬로 변경
                   justifyContent: 'center',
-                  minHeight: 60 
+                  minHeight: 60,
+                  width: '100%' // 전체 너비 사용
                 }}>
                   {showLoading ? (
-                    <LoadingDots 
-                      animationValues={animValues} 
-                      loadingText="추천을 준비중..."
+                    <View style={{ alignItems: 'center', width: '100%' }}>
+                      <LoadingDots 
+                        animationValues={animValues} 
+                      />
+                    </View>
+                  ) : showMessage && showTyping ? (
+                    <TypingText
+                      text={welcomeMessage}
+                      speed={isAnimationEnabled ? 40 : 0} // 애니메이션 비활성화 시 즉시 표시
+                      style={[
+                        dynamicStyles.welcomeText,
+                        { 
+                          color: '#333',
+                          textAlign: 'left', // 좌측 정렬
+                          width: '100%',
+                          lineHeight: isSmallScreen ? 24 : 28, // 줄 간격 조정
+                        }
+                      ]}
                     />
-                  ) : (
-                    <Text style={[
-                      dynamicStyles.welcomeText,
-                      { 
-                        opacity: showMessage ? 1 : 0,
-                        color: showMessage ? '#333' : '#999',
-                        textAlign: 'center'
-                      }
-                    ]}>
-                      오늘은 "치킨" 어때요?     {/*  시작화면에 띄울 메세지 */}
-                    </Text>
-                  )}
+                  ) : null}
                 </View>
               </>
             )}

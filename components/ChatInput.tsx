@@ -50,7 +50,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           ]}
           value={inputText}
           onChangeText={setInputText}
-          placeholder={isLoading ? "처리 중..." : "얌이에게 물어보세요! 🍽️"}
+          placeholder={isLoading ? "처리 중..." : "르시에게 물어보세요! 🍽️"}
           placeholderTextColor="#999"
           returnKeyType="send"
           onSubmitEditing={onSendMessage}
