@@ -36,6 +36,19 @@ interface CharacterItem {
   unlocked: boolean;
 }
 
+// 밥풀 아이콘 컴포넌트 생성
+const RiceIcon = ({ size = 4 }) => (
+  <Image
+    source={require('../assets/rice.png')}
+    style={{
+      width: size,
+      height: size, // 밥알 모양에 맞게 비율 조정
+      resizeMode: 'contain',
+      transform: [{ rotate: '30deg' }],
+    }}
+  />
+);
+
 // 상점 아이템들 정의
 const SHOP_ITEMS: CharacterItem[] = [
   {
@@ -319,7 +332,7 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
               <Text style={styles.freeText}>무료</Text>
             ) : (
               <View style={styles.priceRow}>
-                <View style={styles.riceIcon} />
+                <RiceIcon size={14} />
                 <Text style={styles.itemPrice}>{item.price.toLocaleString()}</Text>
               </View>
             )}
@@ -350,13 +363,13 @@ const CharacterShopModal: React.FC<CharacterShopModalProps> = ({
           <View style={styles.titleContainer}>
             <Text style={styles.title}>캐릭터 상점</Text>
             <Text style={styles.subtitle}>
-              {isLoading ? '로딩 중...' : '나비얌이를 꾸며보세요!'}
+              {isLoading ? '로딩 중...' : '그릇이를 꾸며보세요!'}
             </Text>
           </View>
           
-          {/* 밥풀 표시 */}
+          {/* 밥풀 표시 - SVG 아이콘 적용 */}
           <View style={styles.ricePulContainer}>
-            <View style={styles.riceIcon} />
+            <RiceIcon size={16} />
             <Text style={styles.ricePulAmount}>{ricePul.toLocaleString()}</Text>
           </View>
         </View>
@@ -457,18 +470,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#a8e6a8',
   },
-  riceIcon: {
-    width: 12,
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 6,
-    marginRight: 6,
-    transform: [{ rotate: '15deg' }],
-  },
   ricePulAmount: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2d5a2d',
+    marginLeft: 6, // SVG 아이콘과의 간격
   },
   categoryContainer: {
     flexDirection: 'row',
@@ -614,6 +620,7 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4, // SVG 아이콘과 텍스트 사이 간격
   },
   itemPrice: {
     fontSize: 16,

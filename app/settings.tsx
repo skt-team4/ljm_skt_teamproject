@@ -10,11 +10,11 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import tmapService from '../services/tmapService';
 
 interface SettingsProps {
   // 필요한 props 타입 정의
@@ -25,6 +25,21 @@ interface AddressInfo {
   latitude?: number;
   longitude?: number;
   detailAddress?: string;
+}
+
+interface WeatherInfo {
+  temperature: number;
+  condition: string;
+  description?: string;
+}
+
+interface SearchResult {
+  id: string;
+  name: string;
+  address: string;
+  fullAddress: string;
+  lat: number;
+  lng: number;
 }
 
 // 추천 카테고리 타입 정의
@@ -89,6 +104,10 @@ const Settings: React.FC<SettingsProps> = () => {
   const [detailAddress, setDetailAddress] = useState<string>('');
   const [savedAddress, setSavedAddress] = useState<AddressInfo | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   
   // 추천 카테고리 관련 상태
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -100,6 +119,7 @@ const Settings: React.FC<SettingsProps> = () => {
 
   // 앱 설정 관련 상태
   const [isAnimationEnabled, setIsAnimationEnabled] = useState<boolean>(true);
+  
 
   // 저장된 주소 불러오기
   useEffect(() => {
@@ -107,7 +127,58 @@ const Settings: React.FC<SettingsProps> = () => {
     loadSelectedCategories();
     loadSelectedAllergies();
     loadAnimationSettings();
+    loadWeatherInfo();
   }, []);
+
+  // 날씨 정보 불러오기
+  const loadWeatherInfo = async (customLat?: number, customLon?: number) => {
+    try {
+      const API_KEY = '72cade2afd8d0b233391812e15fda078';
+      let lat = customLat || 37.5665; // 서울 기본값
+      let lon = customLon || 126.9780;
+      
+      // customLat/Lon이 없으면 저장된 위치 사용
+      if (!customLat || !customLon) {
+        const savedLocation = await AsyncStorage.getItem('userLocation');
+        if (savedLocation) {
+          const location = JSON.parse(savedLocation);
+          lat = location.latitude;
+          lon = location.longitude;
+        }
+      }
+      
+      console.log('날씨 정보 로드 중...', { lat, lon });
+      
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=kr`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('날씨 데이터:', data);
+        
+        // 날씨 상태 매핑
+        const main = data.weather[0].main.toLowerCase();
+        let condition = '맑음';
+        
+        if (main.includes('rain')) condition = '비';
+        else if (main.includes('snow')) condition = '눈';
+        else if (main.includes('cloud')) condition = '흐림';
+        else if (main.includes('clear')) condition = '맑음';
+        
+        setWeather({
+          temperature: Math.round(data.main.temp),
+          condition: condition,
+          description: data.weather[0].description
+        });
+        console.log('날씨 정보 업데이트 완료:', {
+          temperature: Math.round(data.main.temp),
+          condition: condition
+        });
+      }
+    } catch (error) {
+      console.error('날씨 정보 로드 실패:', error);
+    }
+  };
 
   const loadSavedAddress = async () => {
     try {
@@ -161,6 +232,9 @@ const Settings: React.FC<SettingsProps> = () => {
       console.error('애니메이션 설정 불러오기 실패:', error);
     }
   };
+
+
+
 
   // 추천 카테고리 저장
   const saveSelectedCategories = async (categories: string[]) => {
@@ -234,29 +308,190 @@ const Settings: React.FC<SettingsProps> = () => {
     saveSelectedAllergies(selectedAllergies);
   };
 
+  // 주소 검색
+  const searchAddress = async () => {
+    if (!address.trim()) {
+      Alert.alert('알림', '검색할 주소를 입력해주세요.');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const result = await tmapService.searchAddress(address);
+      if (result.success && result.results.length > 0) {
+        setSearchResults(result.results);
+        setShowSearchResults(true);
+      } else {
+        Alert.alert('검색 결과 없음', '입력한 주소를 찾을 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('주소 검색 실패:', error);
+      Alert.alert('오류', '주소 검색에 실패했습니다.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // 검색 결과 선택
+  const selectSearchResult = async (result: SearchResult) => {
+    // 더 직관적인 주소 형식 생성
+    let displayAddress = result.name || '';
+    if (result.address) {
+      // 주소에서 중요한 부분 추출
+      const addressParts = result.address.trim().split(' ');
+      const importantParts = addressParts.filter(part => 
+        !part.includes('대한민국') && 
+        !part.includes('KR') &&
+        part.trim() !== ''
+      );
+      displayAddress = importantParts.join(' ');
+    }
+    
+    const addressInfo: AddressInfo = {
+      address: displayAddress || result.fullAddress,
+      latitude: result.lat,
+      longitude: result.lng,
+      detailAddress: detailAddress.trim(),
+    };
+
+    await AsyncStorage.setItem('userAddress', JSON.stringify(addressInfo));
+    await AsyncStorage.setItem('userLocation', JSON.stringify({ 
+      latitude: result.lat, 
+      longitude: result.lng 
+    }));
+    
+    setSavedAddress(addressInfo);
+    setAddress(displayAddress || result.fullAddress);
+    setShowSearchResults(false);
+    setSearchResults([]);
+    setIsEditing(false);
+    
+    // 날씨 정보만 새로고침 (대화 맥락은 유지) - 새 위치 정보 전달
+    loadWeatherInfo(result.lat, result.lng);
+    
+    Alert.alert('성공', '주소가 설정되었습니다. 날씨 정보가 업데이트되었습니다.');
+  };
+
   const saveAddress = async () => {
     if (!address.trim()) {
       Alert.alert('알림', '주소를 입력해주세요.');
       return;
     }
 
-    try {
-      const addressInfo: AddressInfo = {
-        address: address.trim(),
-        detailAddress: detailAddress.trim(),
-      };
-
-      await AsyncStorage.setItem('userAddress', JSON.stringify(addressInfo));
-      setSavedAddress(addressInfo);
-      setIsEditing(false);
-    } catch (error) {
-      console.error('주소 저장 실패:', error);
-      Alert.alert('오류', '주소 저장에 실패했습니다.');
-    }
+    // 먼저 주소 검색을 통해 정확한 주소 확인
+    await searchAddress();
   };
 
-  const getCurrentLocation = () => {
-    Alert.alert('개발중', '현재 위치 가져오기 기능은 개발중입니다.');
+  const getCurrentLocation = async () => {
+    try {
+      // 웹에서 브라우저 위치 API 사용
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log('현재 위치:', latitude, longitude);
+            
+            // T-Map 역지오코딩으로 주소 변환
+            try {
+              const result = await tmapService.reverseGeocode(latitude, longitude);
+              if (result.success) {
+                const addressInfo: AddressInfo = {
+                  address: result.fullAddress || `위도: ${latitude}, 경도: ${longitude}`,
+                  latitude,
+                  longitude,
+                  detailAddress: '',
+                };
+                
+                setAddress(addressInfo.address);
+                setSavedAddress(addressInfo);
+                await AsyncStorage.setItem('userAddress', JSON.stringify(addressInfo));
+                await AsyncStorage.setItem('userLocation', JSON.stringify({ latitude, longitude }));
+                
+                // 날씨 정보만 새로고침 (대화 맥락은 유지)
+                loadWeatherInfo(latitude, longitude);
+                
+                Alert.alert('성공', '현재 위치가 설정되었습니다. 날씨 정보가 업데이트되었습니다.');
+                setIsEditing(false);
+              } else {
+                Alert.alert('오류', '주소 변환에 실패했습니다.');
+              }
+            } catch (error) {
+              console.error('역지오코딩 오류:', error);
+              // T-Map 실패 시 좌표만 저장
+              const addressInfo: AddressInfo = {
+                address: `서울특별시 (위도: ${latitude.toFixed(4)}, 경도: ${longitude.toFixed(4)})`,
+                latitude,
+                longitude,
+                detailAddress: '',
+              };
+              
+              setAddress(addressInfo.address);
+              setSavedAddress(addressInfo);
+              await AsyncStorage.setItem('userAddress', JSON.stringify(addressInfo));
+              await AsyncStorage.setItem('userLocation', JSON.stringify({ latitude, longitude }));
+              
+              // 날씨 정보만 새로고침 (대화 맥락은 유지)
+              loadWeatherInfo(latitude, longitude);
+              
+              Alert.alert('성공', '현재 위치가 설정되었습니다. 날씨 정보가 업데이트되었습니다.');
+              setIsEditing(false);
+            }
+          },
+          (error) => {
+            console.error('위치 가져오기 실패:', error);
+            if (error.code === 1) {
+              Alert.alert('위치 권한', '위치 접근 권한이 필요합니다. 브라우저 설정에서 위치 권한을 허용해주세요.');
+            } else {
+              Alert.alert('오류', '현재 위치를 가져올 수 없습니다.');
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        // 모바일 환경이거나 지원하지 않는 경우 기본 위치 사용
+        Alert.alert(
+          '위치 서비스',
+          '현재 환경에서 위치 서비스를 사용할 수 없습니다. 서울시청을 기본 위치로 설정하시겠습니까?',
+          [
+            { text: '취소', style: 'cancel' },
+            {
+              text: '설정',
+              onPress: async () => {
+                const defaultLocation = {
+                  latitude: 37.5665,
+                  longitude: 126.9780,
+                };
+                
+                const addressInfo: AddressInfo = {
+                  address: '서울특별시 중구 태평로1가 (서울시청)',
+                  latitude: defaultLocation.latitude,
+                  longitude: defaultLocation.longitude,
+                  detailAddress: '',
+                };
+                
+                setAddress(addressInfo.address);
+                setSavedAddress(addressInfo);
+                await AsyncStorage.setItem('userAddress', JSON.stringify(addressInfo));
+                await AsyncStorage.setItem('userLocation', JSON.stringify(defaultLocation));
+                
+                // 날씨 정보만 새로고침 (대화 맥락은 유지)
+                loadWeatherInfo(defaultLocation.latitude, defaultLocation.longitude);
+                
+                Alert.alert('성공', '기본 위치가 설정되었습니다. 날씨 정보가 업데이트되었습니다.');
+                setIsEditing(false);
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('위치 가져오기 오류:', error);
+      Alert.alert('오류', '위치를 가져오는 중 오류가 발생했습니다.');
+    }
   };
 
   const clearAddress = () => {
@@ -310,7 +545,26 @@ const Settings: React.FC<SettingsProps> = () => {
         style={[styles.header, { paddingTop: insets.top }]}
       >
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              // 모달이나 검색 결과가 열려있으면 먼저 닫기
+              if (showSearchResults) {
+                setShowSearchResults(false);
+                setSearchResults([]);
+              } else if (showPersonaModal) {
+                setShowPersonaModal(false);
+              } else if (showCategoryModal) {
+                setShowCategoryModal(false);
+              } else if (showAllergyModal) {
+                setShowAllergyModal(false);
+              } else if (isEditing) {
+                setIsEditing(false);
+              } else {
+                router.back();
+              }
+            }} 
+            style={styles.backButton}
+          >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           
@@ -318,7 +572,19 @@ const Settings: React.FC<SettingsProps> = () => {
             <Text style={styles.headerTitle}>설정</Text>
           </View>
           
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              // 모든 모달과 편집 상태 초기화 후 뒤로가기
+              setShowSearchResults(false);
+              setSearchResults([]);
+              setShowPersonaModal(false);
+              setShowCategoryModal(false);
+              setShowAllergyModal(false);
+              setIsEditing(false);
+              router.back();
+            }} 
+            style={styles.closeButton}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -330,87 +596,6 @@ const Settings: React.FC<SettingsProps> = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* 주소 설정 섹션 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📍 주소 설정</Text>
-          
-          {savedAddress && !isEditing ? (
-            <View style={styles.savedAddressContainer}>
-              <Text style={styles.savedAddressLabel}>저장된 주소</Text>
-              <Text style={styles.savedAddress}>{savedAddress.address}</Text>
-              {savedAddress.detailAddress && (
-                <Text style={styles.savedDetailAddress}>
-                  상세주소: {savedAddress.detailAddress}
-                </Text>
-              )}
-              
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.button, styles.editButton]}
-                  onPress={() => setIsEditing(true)}
-                >
-                  <Text style={styles.editButtonText}>수정</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.button, styles.deleteButton]}
-                  onPress={clearAddress}
-                >
-                  <Text style={styles.deleteButtonText}>삭제</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>주소</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="예: 서울시 강남구 테헤란로 123"
-                value={address}
-                onChangeText={setAddress}
-                multiline={true}
-                numberOfLines={2}
-              />
-              
-              <Text style={styles.inputLabel}>상세주소 (선택)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="예: 101동 502호"
-                value={detailAddress}
-                onChangeText={setDetailAddress}
-              />
-              
-              <TouchableOpacity
-                style={styles.locationButton}
-                onPress={getCurrentLocation}
-              >
-                <Text style={styles.locationButtonText}>📍 현재 위치 사용</Text>
-              </TouchableOpacity>
-              
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.button, styles.saveButton]}
-                  onPress={saveAddress}
-                >
-                  <Text style={styles.saveButtonText}>저장</Text>
-                </TouchableOpacity>
-                
-                {savedAddress && (
-                  <TouchableOpacity
-                    style={[styles.button, styles.cancelButton]}
-                    onPress={() => {
-                      setIsEditing(false);
-                      setAddress(savedAddress.address);
-                      setDetailAddress(savedAddress.detailAddress || '');
-                    }}
-                  >
-                    <Text style={styles.cancelButtonText}>취소</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          )}
-        </View>
-
         {/* 추천 카테고리 설정 섹션 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🍽️ 추천 카테고리</Text>
@@ -477,7 +662,7 @@ const Settings: React.FC<SettingsProps> = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>애니메이션 효과</Text>
               <Text style={styles.settingDescription}>
-                앱 내 애니메이션 효과를 {isAnimationEnabled ? '활성화' : '비활성화'}합니다
+                앱 내 애니메이션 효과를 활성화합니다
               </Text>
             </View>
             <Switch
@@ -624,6 +809,7 @@ const Settings: React.FC<SettingsProps> = () => {
           </ScrollView>
         </View>
       </Modal>
+
     </View>
   );
 };
@@ -758,6 +944,64 @@ const styles = StyleSheet.create({
   locationButtonText: {
     color: '#2196f3',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  searchButton: {
+    backgroundColor: '#fff3e0',
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+  searchButtonText: {
+    color: '#ff9800',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  searchResultsContainer: {
+    marginTop: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    maxHeight: 200,
+  },
+  searchResultsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  searchResultsList: {
+    maxHeight: 150,
+  },
+  searchResultItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  searchResultName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  searchResultAddress: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  weatherContainer: {
+    backgroundColor: '#e3f5ff',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#81d4fa',
+  },
+  weatherText: {
+    fontSize: 14,
+    color: '#0277bd',
     fontWeight: '500',
   },
   buttonRow: {
@@ -911,6 +1155,11 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   modalSaveText: {
+    fontSize: 16,
+    color: '#FF8F00',
+    fontWeight: '600',
+  },
+  modalDoneText: {
     fontSize: 16,
     color: '#FF8F00',
     fontWeight: '600',

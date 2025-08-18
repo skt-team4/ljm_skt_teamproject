@@ -38,7 +38,7 @@ const nutritionData = {
 };
 
 export default function NutritionScreen() {
-  const [selectedTab, setSelectedTab] = useState<'daily' | 'weekly' | 'balance'>('daily');
+  const [selectedTab, setSelectedTab] = useState<'daily' | 'weekly'>('daily');
 
   // 칼로리 도넛 차트 데이터
   const calorieChartData = [
@@ -144,7 +144,6 @@ export default function NutritionScreen() {
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>영양소 리포트</Text>
-        <Text style={styles.headerSubtitle}>시각적으로 확인하는 영양 균형</Text>
       </View>
 
       {/* 탭 선택 */}
@@ -154,7 +153,7 @@ export default function NutritionScreen() {
           onPress={() => setSelectedTab('daily')}
         >
           <Text style={[styles.tabText, selectedTab === 'daily' && styles.activeTabText]}>
-            📊 오늘
+            📊 일간 리포트
           </Text>
         </TouchableOpacity>
         
@@ -163,16 +162,7 @@ export default function NutritionScreen() {
           onPress={() => setSelectedTab('weekly')}
         >
           <Text style={[styles.tabText, selectedTab === 'weekly' && styles.activeTabText]}>
-            📈 주간
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, selectedTab === 'balance' && styles.activeTab]}
-          onPress={() => setSelectedTab('balance')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'balance' && styles.activeTabText]}>
-            🎯 균형
+            📈 주간 리포트
           </Text>
         </TouchableOpacity>
       </View>
@@ -236,6 +226,59 @@ export default function NutritionScreen() {
                       </Text>
                     </View>
                   ))}
+                </View>
+              </View>
+            </View>
+
+            {/* 미량 영양소 원형 차트들 */}
+            <View style={styles.chartCard}>
+              <Text style={styles.chartTitle}>💊 비타민 & 미네랄</Text>
+              <View style={styles.microGrid}>
+                {nutritionData.today.micronutrients.map((micro, index) => (
+                  <MicronutrientCard
+                    key={index}
+                    name={micro.name}
+                    percentage={micro.percentage}
+                    color={micro.color}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {/* 영양 균형 점수 */}
+            <View style={styles.chartCard}>
+              <Text style={styles.chartTitle}>🎯 오늘의 영양 균형</Text>
+              <View style={styles.radarContainer}>
+                <View style={styles.radarChart}>
+                  <View style={styles.radarCenter}>
+                    <Text style={styles.radarScore}>78</Text>
+                    <Text style={styles.radarLabel}>균형점수</Text>
+                  </View>
+                </View>
+                <View style={styles.radarLegend}>
+                  <Text style={styles.radarDescription}>
+                    전체적으로 균형잡힌 식단이에요! 🎉{'\n'}
+                    비타민 D와 식이섬유를 조금 더 섭취해보세요.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 개선 제안 */}
+            <View style={styles.adviceCard}>
+              <Text style={styles.adviceTitle}>💡 맞춤 조언</Text>
+              <View style={styles.adviceList}>
+                <View style={styles.adviceItem}>
+                  <Text style={styles.adviceEmoji}>🥬</Text>
+                  <Text style={styles.adviceText}>녹색 채소로 식이섬유를 늘려보세요</Text>
+                </View>
+                <View style={styles.adviceItem}>
+                  <Text style={styles.adviceEmoji}>☀️</Text>
+                  <Text style={styles.adviceText}>햇빛을 쬐거나 비타민D 보충제를 고려해보세요</Text>
+                </View>
+                <View style={styles.adviceItem}>
+                  <Text style={styles.adviceEmoji}>🐟</Text>
+                  <Text style={styles.adviceText}>오메가3가 풍부한 생선을 추가해보세요</Text>
                 </View>
               </View>
             </View>
@@ -305,61 +348,22 @@ export default function NutritionScreen() {
                 </View>
               </View>
             </View>
-          </View>
-        )}
 
-        {selectedTab === 'balance' && (
-          <View>
-            {/* 미량 영양소 원형 차트들 */}
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>💊 비타민 & 미네랄</Text>
-              <View style={styles.microGrid}>
-                {nutritionData.today.micronutrients.map((micro, index) => (
-                  <MicronutrientCard
-                    key={index}
-                    name={micro.name}
-                    percentage={micro.percentage}
-                    color={micro.color}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {/* 영양 균형 레이더 차트 (시뮬레이션) */}
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>🎯 오늘의 영양 균형</Text>
-              <View style={styles.radarContainer}>
-                <View style={styles.radarChart}>
-                  {/* 간단한 육각형 레이더 차트 시뮬레이션 */}
-                  <View style={styles.radarCenter}>
-                    <Text style={styles.radarScore}>78</Text>
-                    <Text style={styles.radarLabel}>균형점수</Text>
-                  </View>
-                </View>
-                <View style={styles.radarLegend}>
-                  <Text style={styles.radarDescription}>
-                    전체적으로 균형잡힌 식단이에요! 🎉{'\n'}
-                    비타민 D와 식이섬유를 조금 더 섭취해보세요.
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* 개선 제안 */}
+            {/* 주간 개선 제안 */}
             <View style={styles.adviceCard}>
-              <Text style={styles.adviceTitle}>💡 맞춤 조언</Text>
+              <Text style={styles.adviceTitle}>📊 주간 분석 & 조언</Text>
               <View style={styles.adviceList}>
                 <View style={styles.adviceItem}>
-                  <Text style={styles.adviceEmoji}>🥬</Text>
-                  <Text style={styles.adviceText}>녹색 채소로 식이섬유를 늘려보세요</Text>
+                  <Text style={styles.adviceEmoji}>📈</Text>
+                  <Text style={styles.adviceText}>이번 주는 전주 대비 영양 균형이 개선되었어요</Text>
                 </View>
                 <View style={styles.adviceItem}>
-                  <Text style={styles.adviceEmoji}>☀️</Text>
-                  <Text style={styles.adviceText}>햇빛을 쬐거나 비타민D 보충제를 고려해보세요</Text>
+                  <Text style={styles.adviceEmoji}>🎯</Text>
+                  <Text style={styles.adviceText}>목표 칼로리 달성률이 85%로 양호합니다</Text>
                 </View>
                 <View style={styles.adviceItem}>
-                  <Text style={styles.adviceEmoji}>🐟</Text>
-                  <Text style={styles.adviceText}>오메가3가 풍부한 생선을 추가해보세요</Text>
+                  <Text style={styles.adviceEmoji}>💪</Text>
+                  <Text style={styles.adviceText}>다음 주에는 단백질 섭취를 10% 늘려보세요</Text>
                 </View>
               </View>
             </View>
@@ -377,19 +381,19 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingTop: 45,
+    paddingBottom: 15,
     backgroundColor: '#fff',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: '#0b0b0bff',
+    marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#FFBF00',
   },
   tabContainer: {
     flexDirection: 'row',

@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
   Dimensions,
+  Image,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -35,19 +36,21 @@ export default function WelcomeScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        {/* 상단 여백 */}
-        <View style={styles.topSection}>
-          {/* 로고/타이틀 영역 */}
-          <View style={styles.titleContainer}>
-            <Text style={styles.appTitle}>밥풀레이스</Text>
-            <Text style={styles.appSubtitle}>맛있는 식사의 시작</Text>
-            <Text style={styles.welcomeEmoji}>🍽️</Text>
-          </View>
+      {/* 상단 여백 */}
+      <View style={styles.topSection}>
+        {/* 로고/타이틀 영역 */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.appTitle}>밥풀레이스</Text>
+          <Text style={styles.appSubtitle}>맛있는 식사의 시작</Text>
+          <Image 
+            source={require('../../assets/그르시.png')} 
+            style={styles.logoImage}
+          />
         </View>
+      </View>
 
         {/* 중간 설명 영역 */}
         <View style={styles.middleSection}>
-          <Text style={styles.descriptionTitle}>나비얌이와 함께</Text>
           <Text style={styles.descriptionText}>
             맞춤형 음식 추천부터{'\n'}
             급식카드 결제 서비스까지{'\n'}
@@ -200,5 +203,12 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontSize: 12,
     opacity: 0.8,
+  },
+    logoImage: {
+    width: 200,  // 원하는 크기로 조정
+    height: 200, // 원하는 크기로 조정
+    alignSelf: 'center',
+    marginBottom: -140,
+    resizeMode: 'contain', // 또는 'cover', 'stretch' 등
   },
 });

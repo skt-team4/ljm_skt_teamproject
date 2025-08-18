@@ -33,11 +33,11 @@ const gifAnimations = [
 
 // 정적 이미지 배열 (애니메이션 비활성화 시 사용)
 const staticImages = [
-  require('../assets/Hi.gif'), // 첫 번째 프레임만 사용
-  require('../assets/Sad.gif'),
-  require('../assets/Dance.gif'), 
-  require('../assets/Jump.gif'),
-  require('../assets/Sunglass.gif'),
+  require('../assets/Hi_static.png'),
+  require('../assets/Sad_static.png'),
+  require('../assets/Dance_static.png'), 
+  require('../assets/Jump_static.png'),
+  require('../assets/Sunglass_static.png'),
 ];
 
 // Expo Router 옵션
@@ -115,11 +115,11 @@ export default function ChatScreen() {
   const loadAnimationSettings = async () => {
     try {
       const saved = await AsyncStorage.getItem('animationEnabled');
+      console.log('🎬 애니메이션 설정 로드:', saved);
       if (saved !== null) {
         const enabled = JSON.parse(saved);
-        if (enabled !== isAnimationEnabled) {
-          setIsAnimationEnabled(enabled);
-        }
+        console.log('🎬 애니메이션 활성화 상태:', enabled);
+        setIsAnimationEnabled(enabled);
       }
     } catch (error) {
       console.error('애니메이션 설정 불러오기 실패:', error);
@@ -147,6 +147,19 @@ export default function ChatScreen() {
       handleGifChange(0);
     }
   };
+
+  // 애니메이션 설정 로드 (컴포넌트 마운트 시)
+  useEffect(() => {
+    loadAnimationSettings();
+  }, []);
+
+  // 화면 포커스 시 애니메이션 설정 다시 로드
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🎬 화면 포커스 - 애니메이션 설정 다시 로드');
+      loadAnimationSettings();
+    }, [])
+  );
 
   // currentGifIndex 변경 감지 (디버깅용)
   useEffect(() => {
@@ -378,7 +391,7 @@ export default function ChatScreen() {
                         textAlign: 'center'
                       }
                     ]}>
-                      오늘은 "치킨" 어때요? 
+                      오늘은 "치킨" 어때요?     {/*  시작화면에 띄울 메세지 */}
                     </Text>
                   )}
                 </View>
@@ -405,12 +418,12 @@ export default function ChatScreen() {
               <Image
                 source={
                   isAnimationEnabled 
-                    ? (gifAnimations[currentGifIndex] || gifAnimations[0]) 
+                    ? (gifAnimations[currentGifIndex] || gifAnimations[0])
                     : (staticImages[currentGifIndex] || staticImages[0])
                 }
                 style={dynamicStyles.characterGif}
                 contentFit="contain"
-                transition={isAnimationEnabled ? 1000 : 0} // 애니메이션 비활성화 시 전환 효과 제거
+                transition={isAnimationEnabled ? 1000 : 0}
               />
             </TouchableOpacity>
           </View>

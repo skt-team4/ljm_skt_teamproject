@@ -8,6 +8,11 @@ const MEAL_CARD_BALANCE_KEY = 'meal_card_balance';
 const TRANSACTION_HISTORY_KEY = 'integrated_transaction_history';
 const USER_PROFILE_KEY = 'user_profile';
 
+// 🔥 프로필 캐시 추가
+let profileCache: UserProfile | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
+
 // 인터페이스 정의
 export interface Transaction {
   id: string;
@@ -354,25 +359,50 @@ export const getRicePul = async (): Promise<number> => {
   }
 };
 
-// 사용자 프로필 조회
-export const getUserProfile = async (): Promise<UserProfile> => {
+// 사용자 프로필 조회 (캐싱 적용)
+export const getUserProfile = async (forceRefresh: boolean = false): Promise<UserProfile> => {
   try {
+    // 캐시가 유효하고 강제 새로고침이 아닌 경우 캐시 반환
+    const now = Date.now();
+    if (!forceRefresh && profileCache && (now - cacheTimestamp) < CACHE_DURATION) {
+      return profileCache;
+    }
+
     const profileJson = await AsyncStorage.getItem(USER_PROFILE_KEY);
     if (profileJson) {
       const profile = JSON.parse(profileJson);
+      
       // 프로필에서 누락된 필드들을 최신 데이터로 보완
       profile.ricePul = await getRicePul();
       profile.level = await getRicePulLevel();
-      profile.mealCard = await getMealCardInfo();  // null일 수 있음
+      profile.mealCard = await getMealCardInfo();
+      
+      // 🔥 이름이 "나비얌 사용자"면 "사용자"로 변경 (한 번만)
+      let shouldSave = false;
+      if (profile.name === "나비얌 사용자") {
+        profile.name = "사용자";
+        shouldSave = true;
+        console.log('🔄 이름을 "사용자"로 변경합니다.');
+      }
+      
+      // 변경사항이 있으면 저장
+      if (shouldSave) {
+        await saveUserProfile(profile);
+      }
+      
+      // 🔥 캐시 업데이트
+      profileCache = profile;
+      cacheTimestamp = now;
+      
       return profile;
     }
     
     // 기본 프로필 생성
     const defaultProfile: UserProfile = {
-      name: '나비얌 사용자',
+      name: '사용자',
       ricePul: await getRicePul(),
       level: await getRicePulLevel(),
-      mealCard: null,  // ✅ 수정: 초기에는 카드가 없음
+      mealCard: null,
       totalEarnedRicePul: 0,
       totalSpentRicePul: 0,
       totalMealSpent: 0,
@@ -380,12 +410,18 @@ export const getUserProfile = async (): Promise<UserProfile> => {
     };
     
     await saveUserProfile(defaultProfile);
+    
+    // 🔥 캐시 업데이트
+    profileCache = defaultProfile;
+    cacheTimestamp = now;
+    
     return defaultProfile;
   } catch (error) {
     console.error('사용자 프로필 조회 실패:', error);
+    
     // 에러 시 기본값 반환
-    return {
-      name: '나비얌 사용자',
+    const errorProfile: UserProfile = {
+      name: '사용자',
       ricePul: 0,
       level: {
         level: 1,
@@ -394,19 +430,31 @@ export const getUserProfile = async (): Promise<UserProfile> => {
         title: "밥풀 새싹",
         benefits: ["기본 추천 기능"]
       },
-      mealCard: null,  // ✅ 수정: 에러 시에도 카드는 없음
+      mealCard: null,
       totalEarnedRicePul: 0,
       totalSpentRicePul: 0,
       totalMealSpent: 0,
       joinDate: Date.now()
     };
+    
+    // 🔥 에러 시에도 캐시 설정
+    profileCache = errorProfile;
+    cacheTimestamp = Date.now();
+    
+    return errorProfile;
   }
 };
 
-// 사용자 프로필 저장
+// 사용자 프로필 저장 (캐시 업데이트 포함)
 const saveUserProfile = async (profile: UserProfile): Promise<void> => {
   try {
     await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+    
+    // 🔥 저장할 때마다 캐시 업데이트
+    profileCache = profile;
+    cacheTimestamp = Date.now();
+    
+    console.log('💾 프로필 저장 및 캐시 업데이트 완료');
   } catch (error) {
     console.error('사용자 프로필 저장 실패:', error);
   }
@@ -492,6 +540,10 @@ export const resetAllData = async (): Promise<void> => {
       USER_PROFILE_KEY,
       'last_daily_bonus'
     ]);
+    
+    // 🔥 캐시도 초기화
+    clearProfileCache();
+    
     console.log('모든 데이터가 초기화되었습니다.');
   } catch (error) {
     console.error('데이터 초기화 실패:', error);
@@ -610,4 +662,16 @@ export const deleteMealCard = async (): Promise<boolean> => {
     console.error('급식카드 삭제 실패:', error);
     return false;
   }
+};
+
+// 🔥 캐시 강제 새로고침 함수 추가
+export const refreshUserProfile = async (): Promise<UserProfile> => {
+  return await getUserProfile(true);
+};
+
+// 🔥 캐시 무효화 함수 추가
+export const clearProfileCache = (): void => {
+  profileCache = null;
+  cacheTimestamp = 0;
+  console.log('🗑️ 프로필 캐시가 무효화되었습니다.');
 };
